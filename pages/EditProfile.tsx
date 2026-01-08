@@ -6,10 +6,12 @@ import { useNavigate } from 'react-router-dom';
 import { updateUserProfile } from '../lib/db';
 import { updateProfile } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { useToast } from '../context/ToastContext';
 
 export default function EditProfile() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [name, setName] = useState(profile?.displayName || user?.displayName || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [loading, setLoading] = useState(false);
@@ -19,15 +21,21 @@ export default function EditProfile() {
     if (!user) return;
     setLoading(true);
     
-    // Update Firebase Auth
-    if (auth.currentUser) {
-        await updateProfile(auth.currentUser, { displayName: name });
-    }
+    try {
+        // Update Firebase Auth
+        if (auth.currentUser) {
+            await updateProfile(auth.currentUser, { displayName: name });
+        }
 
-    // Update Realtime DB
-    await updateUserProfile(user.uid, { bio, displayName: name });
-    setLoading(false);
-    navigate(-1);
+        // Update Realtime DB
+        await updateUserProfile(user.uid, { bio, displayName: name });
+        showToast('Profile updated successfully', 'success');
+        navigate(-1);
+    } catch (e) {
+        showToast('Failed to update profile', 'error');
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -43,7 +51,7 @@ export default function EditProfile() {
              <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Display Name</label>
                 <input 
-                    className="w-full bg-dark-light border border-white/10 rounded-xl p-3 focus:border-primary focus:outline-none"
+                    className="w-full bg-dark-light border border-white/10 rounded-xl p-3 focus:border-primary focus:outline-none text-white"
                     placeholder="Your Name"
                     value={name}
                     onChange={e => setName(e.target.value)}
@@ -53,7 +61,7 @@ export default function EditProfile() {
              <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Bio</label>
                 <textarea 
-                    className="w-full bg-dark-light border border-white/10 rounded-xl p-3 focus:border-primary focus:outline-none h-32 resize-none"
+                    className="w-full bg-dark-light border border-white/10 rounded-xl p-3 focus:border-primary focus:outline-none h-32 resize-none text-white"
                     placeholder="Tell us about yourself..."
                     value={bio}
                     onChange={e => setBio(e.target.value)}

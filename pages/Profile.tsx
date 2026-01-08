@@ -1,13 +1,20 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
-import { LogOut, Settings, Shield, User, ChevronRight, BarChart3, MessageCircle } from 'lucide-react';
+import { LogOut, Settings, Shield, User, ChevronRight, BarChart3, MessageCircle, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getNameInitials } from '../lib/utils';
+import { useToast } from '../context/ToastContext';
 
 export default function Profile() {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
+
+  const handleLogout = async () => {
+    await logout();
+    showToast('Logged out successfully', 'success');
+  };
 
   if (!user) {
       return (
@@ -44,25 +51,44 @@ export default function Profile() {
       </div>
 
       {/* Creator Dashboard Entry */}
-      <button 
-        onClick={() => navigate('/dashboard')}
-        className="w-full bg-gradient-to-r from-primary to-secondary p-4 rounded-2xl shadow-lg flex items-center justify-between group active:scale-[0.98] transition-all"
-      >
-         <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-3 rounded-xl text-white">
-                <BarChart3 size={24} />
-            </div>
-            <div className="text-left">
-                <h3 className="text-white font-bold text-lg">Creator Dashboard</h3>
-                <p className="text-white/80 text-xs">Analytics, Monetization & Cashout</p>
-            </div>
-         </div>
-         <ChevronRight className="text-white group-hover:translate-x-1 transition-transform" />
-      </button>
+      {profile?.isCreator ? (
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="w-full bg-dark-light border border-white/10 p-4 rounded-2xl shadow-lg flex items-center justify-between group active:scale-[0.98] transition-all relative overflow-hidden"
+        >
+           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-secondary/10 opacity-50"></div>
+           <div className="flex items-center gap-4 relative z-10">
+              <div className="bg-gradient-to-br from-primary to-secondary p-3 rounded-xl text-white shadow-lg">
+                  <Sparkles size={24} />
+              </div>
+              <div className="text-left">
+                  <h3 className="text-white font-bold text-lg">Creator Studio</h3>
+                  <p className="text-gray-400 text-xs">Analytics, Revenue & Growth</p>
+              </div>
+           </div>
+           <ChevronRight className="text-white group-hover:translate-x-1 transition-transform relative z-10" />
+        </button>
+      ) : (
+        <button 
+          onClick={() => navigate('/dashboard')}
+          className="w-full bg-gradient-to-r from-dark-light to-dark border border-white/5 p-4 rounded-2xl shadow-lg flex items-center justify-between group active:scale-[0.98] transition-all"
+        >
+           <div className="flex items-center gap-4">
+              <div className="bg-white/5 p-3 rounded-xl text-white">
+                  <BarChart3 size={24} />
+              </div>
+              <div className="text-left">
+                  <h3 className="text-white font-bold text-lg">Creator Program</h3>
+                  <p className="text-gray-400 text-xs">Join to start earning</p>
+              </div>
+           </div>
+           <ChevronRight className="text-white group-hover:translate-x-1 transition-transform" />
+        </button>
+      )}
 
       <div className="space-y-2">
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Account</h3>
-        <div className="bg-dark-light rounded-2xl overflow-hidden">
+        <div className="bg-dark-light rounded-2xl overflow-hidden border border-white/5">
           <button className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors border-b border-white/5" onClick={() => navigate('/edit-profile')}>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-lg text-primary"><User size={18} /></div>
@@ -82,7 +108,7 @@ export default function Profile() {
 
       <div className="space-y-2">
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Support</h3>
-        <div className="bg-dark-light rounded-2xl overflow-hidden">
+        <div className="bg-dark-light rounded-2xl overflow-hidden border border-white/5">
            <button className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors" onClick={() => window.open('https://wa.me/252613982172', '_blank')}>
             <div className="flex items-center gap-3">
               <div className="p-2 bg-success/10 rounded-lg text-success"><MessageCircle size={18} /></div>
@@ -93,12 +119,12 @@ export default function Profile() {
         </div>
       </div>
 
-      <Button variant="outline" className="w-full border-error text-error hover:bg-error/10 mt-8" onClick={logout}>
+      <Button variant="outline" className="w-full border-error/50 text-error hover:bg-error/10 mt-8" onClick={handleLogout}>
         <LogOut size={18} className="mr-2" />
         Sign Out
       </Button>
       
-      <p className="text-center text-xs text-gray-600 pb-8">Groupify v2.5</p>
+      <p className="text-center text-xs text-gray-600 pb-8">Groupify v3.1.0</p>
     </div>
   );
 }

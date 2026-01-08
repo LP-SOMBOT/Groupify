@@ -199,6 +199,7 @@ export function useRealtimeWithdrawals() {
 
 export function usePaymentMethods() {
   const [methods, setMethods] = useState<PaymentMethodConfig[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const refPath = ref(db, 'settings/paymentMethods');
@@ -209,9 +210,10 @@ export function usePaymentMethods() {
       } else {
         setMethods([]);
       }
+      setLoading(false);
     });
     return () => unsub();
   }, []);
 
-  return { methods };
+  return { methods, loading };
 }

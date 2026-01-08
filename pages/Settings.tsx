@@ -4,10 +4,12 @@ import Button from '../components/ui/Button';
 import { ChevronLeft, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { updateUserProfile } from '../lib/db';
+import { useToast } from '../context/ToastContext';
 
 export default function Settings() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -15,10 +17,15 @@ export default function Settings() {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
-    await updateUserProfile(user.uid, { paymentPin: pin });
-    setLoading(false);
-    alert('PIN Saved');
-    navigate(-1);
+    try {
+        await updateUserProfile(user.uid, { paymentPin: pin });
+        showToast('Security PIN saved successfully', 'success');
+        navigate(-1);
+    } catch (e) {
+        showToast('Failed to save PIN', 'error');
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -31,14 +38,14 @@ export default function Settings() {
         </div>
 
         <form onSubmit={handleSave} className="bg-dark-light p-6 rounded-2xl border border-white/5 space-y-4">
-            <h2 className="font-bold flex items-center gap-2"><Lock size={18} /> Payment Security</h2>
-            <p className="text-xs text-gray-400">Set a 4-digit PIN for withdrawals.</p>
+            <h2 className="font-bold flex items-center gap-2 text-white"><Lock size={18} className="text-primary"/> Payment Security</h2>
+            <p className="text-xs text-gray-400">Set a 4-digit PIN for withdrawals. You will need this to cash out your earnings.</p>
             
             <input 
                 type="password"
                 maxLength={4}
                 required
-                className="w-full bg-dark border border-white/10 rounded-xl p-3 text-center tracking-widest text-lg focus:border-primary focus:outline-none"
+                className="w-full bg-dark border border-white/10 rounded-xl p-3 text-center tracking-widest text-lg focus:border-primary focus:outline-none text-white"
                 placeholder="****"
                 value={pin}
                 onChange={e => setPin(e.target.value)}
