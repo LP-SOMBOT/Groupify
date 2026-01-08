@@ -34,3 +34,11 @@ export interface CreateGroupData {
   inviteLink: string;
   tags: string[];
 }
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'system' | 'update' | 'alert';
+  createdAt: number;
+}

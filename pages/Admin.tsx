@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { getAllGroupsForAdmin, updateGroupVerification, deleteGroup } from '../lib/firestore';
+import { getAllGroupsForAdmin, updateGroupVerification, deleteGroup, createNotification } from '../lib/firestore';
 import { Group } from '../lib/types';
 import Button from '../components/ui/Button';
-import { Shield, Trash2, CheckCircle, XCircle, RefreshCw, LogOut, Search } from 'lucide-react';
+import { Shield, Trash2, CheckCircle, XCircle, RefreshCw, LogOut, Search, BellRing, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Admin() {
@@ -11,7 +11,13 @@ export default function Admin() {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(false);
     const [filter, setFilter] = useState('');
+    const [view, setView] = useState<'groups' | 'notify'>('groups');
     const navigate = useNavigate();
+
+    // Notification Form
+    const [notifTitle, setNotifTitle] = useState('');
+    const [notifMsg, setNotifMsg] = useState('');
+    const [notifType, setNotifType] = useState<'system' | 'update' | 'alert'>('system');
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -62,6 +68,22 @@ export default function Admin() {
             fetchData(); // Revert on error
         }
     }
+
+    const handleSendNotification = async (e: React.FormEvent) => {
+      e.preventDefault();
+      // eslint-disable-next-line no-restricted-globals
+      if (!confirm('Broadcast this notification to ALL users?')) return;
+      
+      try {
+        await createNotification(notifTitle, notifMsg, notifType);
+        alert('Notification sent!');
+        setNotifTitle('');
+        setNotifMsg('');
+      } catch (e) {
+        console.error(e);
+        alert('Failed to send');
+      }
+    };
 
     const filteredGroups = groups.filter(g => 
         g.name.toLowerCase().includes(filter.toLowerCase()) || 
@@ -134,69 +156,146 @@ export default function Admin() {
                     </div>
                 </div>
 
-                {/* Search */}
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                    <input 
-                        type="text" 
-                        placeholder="Search groups..." 
-                        className="w-full bg-dark-light border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
-                        value={filter}
-                        onChange={e => setFilter(e.target.value)}
-                    />
+                {/* Navigation Tabs */}
+                <div className="flex p-1 bg-dark-light rounded-xl border border-white/5">
+                  <button 
+                    onClick={() => setView('groups')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'groups' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Manage Groups
+                  </button>
+                  <button 
+                    onClick={() => setView('notify')}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'notify' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    Broadcast System
+                  </button>
                 </div>
 
-                {/* List */}
-                <div className="space-y-3">
-                    {loading && groups.length === 0 ? (
-                        <div className="text-center p-8 text-gray-500">Loading data...</div>
-                    ) : filteredGroups.map(group => (
-                        <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex items-center gap-3 hover:border-white/10 transition-colors">
-                            <img 
-                                src={group.iconUrl} 
-                                className="w-12 h-12 rounded-xl bg-gray-800 object-cover border border-white/5" 
-                                alt=""
-                            />
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                    <h3 className="font-bold text-sm text-white truncate">{group.name}</h3>
-                                    {group.isVerified && <CheckCircle size={14} className="text-verified fill-verified/10" />}
+                {view === 'groups' ? (
+                  <>
+                    {/* Search */}
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder="Search groups..." 
+                            className="w-full bg-dark-light border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
+                            value={filter}
+                            onChange={e => setFilter(e.target.value)}
+                        />
+                    </div>
+
+                    {/* List */}
+                    <div className="space-y-3">
+                        {loading && groups.length === 0 ? (
+                            <div className="text-center p-8 text-gray-500">Loading data...</div>
+                        ) : filteredGroups.map(group => (
+                            <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex items-center gap-3 hover:border-white/10 transition-colors">
+                                <img 
+                                    src={group.iconUrl} 
+                                    className="w-12 h-12 rounded-xl bg-gray-800 object-cover border border-white/5" 
+                                    alt=""
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                        <h3 className="font-bold text-sm text-white truncate">{group.name}</h3>
+                                        {group.isVerified && <CheckCircle size={14} className="text-verified fill-verified/10" />}
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                                        <span className="truncate max-w-[100px]">ID: {group.id}</span>
+                                        <span>•</span>
+                                        <span>{new Date(group.createdAt).toLocaleDateString()}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                                    <span className="truncate max-w-[100px]">ID: {group.id}</span>
-                                    <span>•</span>
-                                    <span>{new Date(group.createdAt).toLocaleDateString()}</span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleToggleVerify(group)}
+                                        title={group.isVerified ? "Revoke Verification" : "Verify Group"}
+                                        className={`p-2 rounded-xl transition-all ${
+                                            group.isVerified 
+                                            ? 'text-verified bg-verified/10 hover:bg-verified/20' 
+                                            : 'text-gray-600 bg-white/5 hover:bg-white/10 hover:text-gray-300'
+                                        }`}
+                                    >
+                                        {group.isVerified ? <CheckCircle size={20} /> : <CheckCircle size={20} className="opacity-50" />}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(group.id)}
+                                        title="Delete Group"
+                                        className="p-2 rounded-xl text-error bg-error/10 hover:bg-error/20 transition-all"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handleToggleVerify(group)}
-                                    title={group.isVerified ? "Revoke Verification" : "Verify Group"}
-                                    className={`p-2 rounded-xl transition-all ${
-                                        group.isVerified 
-                                        ? 'text-verified bg-verified/10 hover:bg-verified/20' 
-                                        : 'text-gray-600 bg-white/5 hover:bg-white/10 hover:text-gray-300'
-                                    }`}
-                                >
-                                    {group.isVerified ? <CheckCircle size={20} /> : <CheckCircle size={20} className="opacity-50" />}
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(group.id)}
-                                    title="Delete Group"
-                                    className="p-2 rounded-xl text-error bg-error/10 hover:bg-error/20 transition-all"
-                                >
-                                    <Trash2 size={20} />
-                                </button>
+                        ))}
+                        
+                        {filteredGroups.length === 0 && !loading && (
+                            <div className="text-center p-8 text-gray-600 text-sm">
+                                No groups found.
                             </div>
-                        </div>
-                    ))}
+                        )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="bg-dark-light p-6 rounded-2xl border border-white/5 shadow-lg">
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="p-3 bg-primary/10 rounded-xl text-primary">
+                        <BellRing size={24} />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold">Broadcast Notification</h2>
+                        <p className="text-xs text-gray-400">Send alerts to all users instantly.</p>
+                      </div>
+                    </div>
                     
-                    {filteredGroups.length === 0 && !loading && (
-                         <div className="text-center p-8 text-gray-600 text-sm">
-                            No groups found.
-                         </div>
-                    )}
-                </div>
+                    <form onSubmit={handleSendNotification} className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-400 uppercase">Title</label>
+                        <input
+                          required
+                          className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm focus:border-primary focus:outline-none"
+                          placeholder="e.g. System Maintenance"
+                          value={notifTitle}
+                          onChange={e => setNotifTitle(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-400 uppercase">Message</label>
+                        <textarea
+                          required
+                          rows={3}
+                          className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm focus:border-primary focus:outline-none resize-none"
+                          placeholder="What do you want to tell everyone?"
+                          value={notifMsg}
+                          onChange={e => setNotifMsg(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-400 uppercase">Type</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {['system', 'update', 'alert'].map(t => (
+                            <button
+                              key={t}
+                              type="button"
+                              onClick={() => setNotifType(t as any)}
+                              className={`py-2 rounded-lg text-xs font-bold capitalize border ${notifType === t ? 'bg-primary border-primary' : 'bg-dark border-white/10 text-gray-400'}`}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <Button fullWidth size="lg" className="mt-4 gap-2">
+                         <Send size={18} /> Send Broadcast
+                      </Button>
+                    </form>
+                  </div>
+                )}
             </div>
         </div>
     )

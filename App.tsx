@@ -8,6 +8,7 @@ import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import AddGroup from './pages/AddGroup';
 import Admin from './pages/Admin';
+import Notifications from './pages/Notifications';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Updates to handle redirect back to original location
@@ -39,6 +40,7 @@ export default function App() {
             {/* Public Routes */}
             <Route path="/" element={<Home />} />
             <Route path="/explore" element={<Explore />} />
+            <Route path="/notifications" element={<Notifications />} />
             
             {/* Protected Routes */}
             <Route path="/my-groups" element={<ProtectedRoute><MyGroups /></ProtectedRoute>} />

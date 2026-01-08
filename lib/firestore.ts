@@ -13,9 +13,10 @@ import {
   deleteDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Group, CreateGroupData } from './types';
+import { Group, CreateGroupData, AppNotification } from './types';
 
 const GROUPS_COLLECTION = 'groups';
+const NOTIFICATIONS_COLLECTION = 'notifications';
 
 export const fetchGroups = async (category?: string): Promise<Group[]> => {
   try {
@@ -81,6 +82,34 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     iconUrl: `https://ui-avatars.com/api/?name=${data.name}&background=random&color=fff&size=200`
   });
   return docRef.id;
+};
+
+export const fetchNotifications = async (): Promise<AppNotification[]> => {
+  try {
+    const q = query(
+      collection(db, NOTIFICATIONS_COLLECTION), 
+      orderBy('createdAt', 'desc'),
+      limit(20)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toMillis() || Date.now()
+    } as AppNotification));
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    return [];
+  }
+};
+
+export const createNotification = async (title: string, message: string, type: 'system' | 'update' | 'alert') => {
+  await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
+    title,
+    message,
+    type,
+    createdAt: serverTimestamp()
+  });
 };
 
 // --- Admin Functions ---
