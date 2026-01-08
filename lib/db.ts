@@ -12,7 +12,39 @@ import {
   serverTimestamp
 } from 'firebase/database';
 import { db } from './firebase';
-import { Group, CreateGroupData } from './types';
+import { Group, CreateGroupData, WithdrawalRequest, PaymentMethod, UserProfile } from './types';
+
+// --- Users ---
+
+export const createUserProfile = async (uid: string, email: string, name: string) => {
+  const userRef = ref(db, `users/${uid}`);
+  const snapshot = await get(userRef);
+  if (!snapshot.exists()) {
+    await set(userRef, {
+      uid,
+      email,
+      displayName: name,
+      photoURL: `https://ui-avatars.com/api/?name=${name}&background=6C63FF&color=fff`,
+      joinedAt: Date.now(),
+      balance: 0,
+      isBanned: false,
+      isCreator: false,
+      monetizationFrozen: false
+    });
+  }
+};
+
+export const updateUserProfile = async (uid: string, data: Partial<UserProfile>) => {
+  await update(ref(db, `users/${uid}`), data);
+};
+
+export const adminUpdateUser = async (uid: string, updates: Partial<UserProfile>) => {
+  await update(ref(db, `users/${uid}`), updates);
+};
+
+export const adminAdjustBalance = async (uid: string, amount: number) => {
+  await update(ref(db, `users/${uid}`), { balance: increment(amount) });
+};
 
 // --- Groups ---
 
@@ -25,8 +57,7 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     createdBy: userId,
     createdAt: Date.now(),
     isVerified: false,
-    memberCount: Math.floor(Math.random() * 100) + 1,
-    iconUrl: `https://ui-avatars.com/api/?name=${data.name}&background=random&color=fff&size=200`,
+    status: 'pending', // Pending by default
     views: 0,
     clicks: 0
   };
@@ -35,19 +66,23 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
   return newGroupRef.key as string;
 };
 
-export const updateGroupVerification = async (groupId: string, status: boolean, groupName: string, ownerId: string) => {
+export const updateGroupStatus = async (groupId: string, status: 'approved' | 'rejected' | 'pending', ownerId: string, groupName: string) => {
   const groupRef = ref(db, `groups/${groupId}`);
-  await update(groupRef, { isVerified: status });
+  await update(groupRef, { status });
 
-  if (status) {
-    // Send System Notification to Owner
+  // Notify owner
+  if (status !== 'pending') {
     await createSystemNotification(
       ownerId,
-      "Group Verified",
-      `Your group "${groupName}" has been approved and is now verified!`,
-      "update"
+      `Group ${status === 'approved' ? 'Approved' : 'Rejected'}`,
+      `Your group "${groupName}" has been ${status}.`,
+      status === 'approved' ? 'update' : 'alert'
     );
   }
+};
+
+export const updateGroup = async (groupId: string, data: Partial<Group>) => {
+  await update(ref(db, `groups/${groupId}`), data);
 };
 
 export const deleteGroup = async (groupId: string) => {
@@ -55,13 +90,19 @@ export const deleteGroup = async (groupId: string) => {
   await remove(groupRef);
 };
 
-export const trackGroupClick = async (groupId: string) => {
+export const trackGroupClick = async (groupId: string, ownerId: string, currentUserId?: string) => {
+  // Don't count owner clicks
+  if (currentUserId && currentUserId === ownerId) return;
+
   const updates: any = {};
   updates[`groups/${groupId}/clicks`] = increment(1);
   await update(ref(db), updates);
 };
 
-export const trackGroupView = async (groupId: string) => {
+export const trackGroupView = async (groupId: string, ownerId: string, currentUserId?: string) => {
+  // Don't count owner views
+  if (currentUserId && currentUserId === ownerId) return;
+
   const updates: any = {};
   updates[`groups/${groupId}/views`] = increment(1);
   await update(ref(db), updates);
@@ -69,7 +110,6 @@ export const trackGroupView = async (groupId: string) => {
 
 // --- Notifications ---
 
-// For Admin Broadcasts
 export const createBroadcastNotification = async (title: string, message: string, type: 'system' | 'update' | 'alert') => {
   const notifRef = push(ref(db, 'notifications/broadcasts'));
   await set(notifRef, {
@@ -81,7 +121,6 @@ export const createBroadcastNotification = async (title: string, message: string
   });
 };
 
-// For System Alerts (Specific User)
 export const createSystemNotification = async (userId: string, title: string, message: string, type: 'system' | 'update' | 'alert') => {
   const notifRef = push(ref(db, `notifications/users/${userId}`));
   await set(notifRef, {
@@ -92,4 +131,38 @@ export const createSystemNotification = async (userId: string, title: string, me
     isBroadcast: false,
     read: false
   });
+};
+
+export const markNotificationRead = async (userId: string, notifId: string) => {
+  await update(ref(db, `notifications/users/${userId}/${notifId}`), { read: true });
+};
+
+// --- Withdrawals ---
+
+export const requestWithdrawal = async (userId: string, userName: string, amount: number, method: PaymentMethod, accountNumber: string) => {
+  // Deduct balance first (optimistic)
+  await update(ref(db, `users/${userId}`), { balance: increment(-amount) });
+  
+  const withdrawRef = push(ref(db, 'withdrawals'));
+  await set(withdrawRef, {
+    userId,
+    userName,
+    amount,
+    method,
+    accountNumber,
+    status: 'pending',
+    timestamp: Date.now()
+  });
+};
+
+export const processWithdrawal = async (withdrawalId: string, status: 'paid' | 'rejected', userId: string, amount: number) => {
+  await update(ref(db, `withdrawals/${withdrawalId}`), { status });
+  
+  if (status === 'rejected') {
+    // Refund logic
+    await update(ref(db, `users/${userId}`), { balance: increment(amount) });
+    await createSystemNotification(userId, "Withdrawal Rejected", "Your withdrawal request was rejected and funds returned.", "alert");
+  } else {
+    await createSystemNotification(userId, "Payment Sent", "Your withdrawal has been processed successfully.", "update");
+  }
 };

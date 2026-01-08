@@ -1,23 +1,37 @@
 import React, { useState } from 'react';
-import { updateGroupVerification, deleteGroup, createBroadcastNotification } from '../lib/db';
-import { useAdminRealtimeGroups } from '../hooks/useRealtime';
-import { Group } from '../lib/types';
+import { 
+    updateGroupStatus, 
+    deleteGroup, 
+    createBroadcastNotification, 
+    adminAdjustBalance, 
+    adminUpdateUser,
+    processWithdrawal
+} from '../lib/db';
+import { useAdminRealtimeGroups, useRealtimeUsers, useRealtimeWithdrawals } from '../hooks/useRealtime';
+import { Group, UserProfile, WithdrawalRequest } from '../lib/types';
 import Button from '../components/ui/Button';
-import { Shield, Trash2, CheckCircle, RefreshCw, LogOut, Search, BellRing, Send } from 'lucide-react';
+import { Shield, Trash2, CheckCircle, RefreshCw, LogOut, Search, BellRing, Send, User, XCircle, DollarSign, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Admin() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [pin, setPin] = useState('');
-    const { groups, loading } = useAdminRealtimeGroups();
+    const { groups, loading: groupsLoading } = useAdminRealtimeGroups();
+    const { users } = useRealtimeUsers();
+    const { withdrawals } = useRealtimeWithdrawals();
+
     const [filter, setFilter] = useState('');
-    const [view, setView] = useState<'groups' | 'notify'>('groups');
+    const [view, setView] = useState<'groups' | 'users' | 'withdrawals' | 'notify'>('groups');
     const navigate = useNavigate();
 
     // Notification Form
     const [notifTitle, setNotifTitle] = useState('');
     const [notifMsg, setNotifMsg] = useState('');
     const [notifType, setNotifType] = useState<'system' | 'update' | 'alert'>('system');
+
+    // User Edit State
+    const [editingUser, setEditingUser] = useState<string | null>(null);
+    const [balanceAdj, setBalanceAdj] = useState('');
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,50 +43,39 @@ export default function Admin() {
         }
     }
 
-    const handleToggleVerify = async (group: Group) => {
-        // eslint-disable-next-line no-restricted-globals
-        if (!confirm(`Change verification status for "${group.name}"?`)) return;
-        
+    // --- Actions ---
+
+    const handleGroupStatus = async (group: Group, status: 'approved' | 'rejected') => {
+        if (!confirm(`${status === 'approved' ? 'Approve' : 'Reject'} "${group.name}"?`)) return;
         try {
-            await updateGroupVerification(group.id, !group.isVerified, group.name, group.createdBy);
+            await updateGroupStatus(group.id, status, group.createdBy, group.name);
         } catch (error) {
             console.error(error);
-            alert("Failed to update status");
+            alert("Action failed");
         }
     }
 
-    const handleDelete = async (id: string) => {
-        // eslint-disable-next-line no-restricted-globals
-        if (!confirm('Are you sure you want to PERMANENTLY delete this group?')) return;
-        
-        try {
-            await deleteGroup(id);
-        } catch (error) {
-            console.error(error);
-            alert("Failed to delete group");
-        }
+    const handleUserAction = async (uid: string, action: 'ban' | 'freeze') => {
+        const user = users.find(u => u.uid === uid);
+        if (!user) return;
+        if(action === 'ban') await adminUpdateUser(uid, { isBanned: !user.isBanned });
+        if(action === 'freeze') await adminUpdateUser(uid, { monetizationFrozen: !user.monetizationFrozen });
     }
 
-    const handleSendNotification = async (e: React.FormEvent) => {
-      e.preventDefault();
-      // eslint-disable-next-line no-restricted-globals
-      if (!confirm('Broadcast this notification to ALL users?')) return;
-      
-      try {
-        await createBroadcastNotification(notifTitle, notifMsg, notifType);
-        alert('Broadcast sent!');
-        setNotifTitle('');
-        setNotifMsg('');
-      } catch (e) {
-        console.error(e);
-        alert('Failed to send');
-      }
-    };
+    const handleAddMoney = async (uid: string) => {
+        const amount = parseFloat(balanceAdj);
+        if(isNaN(amount)) return;
+        await adminAdjustBalance(uid, amount);
+        setBalanceAdj('');
+        setEditingUser(null);
+    }
 
-    const filteredGroups = groups.filter(g => 
-        g.name.toLowerCase().includes(filter.toLowerCase()) || 
-        g.id.includes(filter)
-    );
+    const handleWithdrawal = async (req: WithdrawalRequest, action: 'paid' | 'rejected') => {
+        if(!confirm(`Mark as ${action}?`)) return;
+        await processWithdrawal(req.id, action, req.userId, req.amount);
+    }
+
+    // --- Renders ---
 
     if (!isAuthenticated) {
         return (
@@ -83,23 +86,18 @@ export default function Admin() {
                     </div>
                     <h1 className="text-xl font-bold text-center mb-2">Restricted Area</h1>
                     <p className="text-gray-500 text-center text-xs mb-6">Super Admin Access Only</p>
-                    
                     <form onSubmit={handleLogin} className="space-y-4">
                         <input
                             type="password"
                             value={pin}
                             onChange={e => setPin(e.target.value)}
                             placeholder="Enter PIN"
-                            className="w-full bg-dark border border-white/10 rounded-xl px-4 py-3 text-center tracking-widest text-lg focus:border-error outline-none transition-colors text-white"
+                            className="w-full bg-dark border border-white/10 rounded-xl px-4 py-3 text-center tracking-widest text-lg focus:border-error outline-none text-white"
                             autoFocus
                         />
-                        <Button fullWidth variant="danger" type="submit" className="h-12 shadow-none">
-                            Access Control
-                        </Button>
+                        <Button fullWidth variant="danger" type="submit">Access Control</Button>
                     </form>
-                    <button onClick={() => navigate('/')} className="w-full mt-6 text-xs text-gray-500 hover:text-white transition-colors">
-                        ← Back to App
-                    </button>
+                    <button onClick={() => navigate('/')} className="w-full mt-6 text-xs text-gray-500 hover:text-white">← Back to App</button>
                 </div>
             </div>
         )
@@ -107,178 +105,117 @@ export default function Admin() {
 
     return (
         <div className="min-h-screen bg-dark pb-20 font-sans text-gray-100">
-            {/* Header */}
             <div className="bg-dark-light border-b border-white/5 p-4 sticky top-0 z-20 flex justify-between items-center shadow-md">
                 <h1 className="font-bold text-lg flex items-center gap-2 text-error">
-                    <Shield size={20} fill="currentColor" className="text-error/20" />
-                    <span className="tracking-tight">Super Admin</span>
+                    <Shield size={20} fill="currentColor" className="text-error/20" /> Super Admin
                 </h1>
-                <div className="flex gap-2">
-                     <div className="p-2">
-                        <RefreshCw size={20} className={loading ? "animate-spin text-gray-400" : "text-gray-400"} />
-                     </div>
-                     <button onClick={() => setIsAuthenticated(false)} className="p-2 hover:bg-white/10 rounded-lg text-error transition-colors" title="Logout">
-                        <LogOut size={20} />
-                     </button>
-                </div>
+                <button onClick={() => setIsAuthenticated(false)} className="p-2 text-error"><LogOut size={20} /></button>
             </div>
 
             <div className="p-4 space-y-6 max-w-2xl mx-auto">
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-dark-light p-4 rounded-2xl border border-white/5 text-center shadow-lg">
-                        <div className="text-2xl font-bold mb-1">{groups.length}</div>
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total</div>
-                    </div>
-                    <div className="bg-dark-light p-4 rounded-2xl border border-white/5 text-center shadow-lg">
-                        <div className="text-2xl font-bold text-verified mb-1">{groups.filter(g => g.isVerified).length}</div>
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Verified</div>
-                    </div>
-                    <div className="bg-dark-light p-4 rounded-2xl border border-white/5 text-center shadow-lg">
-                         <div className="text-2xl font-bold text-warning mb-1">{groups.filter(g => !g.isVerified).length}</div>
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Pending</div>
-                    </div>
+                {/* Tabs */}
+                <div className="grid grid-cols-4 gap-1 p-1 bg-dark-light rounded-xl border border-white/5">
+                  {['groups', 'users', 'withdrawals', 'notify'].map(t => (
+                      <button 
+                        key={t}
+                        onClick={() => setView(t as any)}
+                        className={`py-2 text-[10px] font-bold uppercase rounded-lg transition-all ${view === t ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
+                      >
+                        {t}
+                      </button>
+                  ))}
                 </div>
 
-                {/* Navigation Tabs */}
-                <div className="flex p-1 bg-dark-light rounded-xl border border-white/5">
-                  <button 
-                    onClick={() => setView('groups')}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'groups' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Manage Groups
-                  </button>
-                  <button 
-                    onClick={() => setView('notify')}
-                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'notify' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    Broadcast System
-                  </button>
-                </div>
-
-                {view === 'groups' ? (
-                  <>
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
-                        <input 
-                            type="text" 
-                            placeholder="Search groups..." 
-                            className="w-full bg-dark-light border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
-                            value={filter}
-                            onChange={e => setFilter(e.target.value)}
-                        />
-                    </div>
-
-                    {/* List */}
+                {view === 'groups' && (
                     <div className="space-y-3">
-                        {loading && groups.length === 0 ? (
-                            <div className="text-center p-8 text-gray-500">Loading data...</div>
-                        ) : filteredGroups.map(group => (
-                            <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex items-center gap-3 hover:border-white/10 transition-colors">
-                                <img 
-                                    src={group.iconUrl} 
-                                    className="w-12 h-12 rounded-xl bg-gray-800 object-cover border border-white/5" 
-                                    alt=""
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5 mb-0.5">
-                                        <h3 className="font-bold text-sm text-white truncate">{group.name}</h3>
-                                        {group.isVerified && <CheckCircle size={14} className="text-verified fill-verified/10" />}
+                        <input type="text" placeholder="Search..." className="w-full bg-dark-light border border-white/5 rounded-xl p-3 text-sm" value={filter} onChange={e => setFilter(e.target.value)} />
+                        {groups.filter(g => g.name.toLowerCase().includes(filter.toLowerCase())).map(group => (
+                            <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex flex-col gap-3">
+                                <div className="flex items-center gap-3">
+                                    <img src={group.iconUrl} className="w-10 h-10 rounded-lg object-cover" />
+                                    <div className="flex-1">
+                                        <div className="font-bold text-sm">{group.name}</div>
+                                        <div className="text-[10px] text-gray-400">Status: <span className={group.status === 'pending' ? 'text-warning' : group.status === 'approved' ? 'text-success' : 'text-error'}>{group.status}</span></div>
                                     </div>
-                                    <div className="flex items-center gap-2 text-[10px] text-gray-500">
-                                        <span className="truncate max-w-[100px]">ID: {group.id}</span>
-                                        <span>•</span>
-                                        <span>{new Date(group.createdAt).toLocaleDateString()}</span>
+                                    <div className="flex gap-2">
+                                        {group.status === 'pending' && (
+                                            <>
+                                                <button onClick={() => handleGroupStatus(group, 'approved')} className="p-2 bg-success/10 text-success rounded-lg"><CheckCircle size={18} /></button>
+                                                <button onClick={() => handleGroupStatus(group, 'rejected')} className="p-2 bg-error/10 text-error rounded-lg"><XCircle size={18} /></button>
+                                            </>
+                                        )}
+                                        <button onClick={() => window.open(group.inviteLink)} className="p-2 bg-white/5 text-white rounded-lg text-xs">View</button>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => handleToggleVerify(group)}
-                                        title={group.isVerified ? "Revoke Verification" : "Verify Group"}
-                                        className={`p-2 rounded-xl transition-all ${
-                                            group.isVerified 
-                                            ? 'text-verified bg-verified/10 hover:bg-verified/20' 
-                                            : 'text-gray-600 bg-white/5 hover:bg-white/10 hover:text-gray-300'
-                                        }`}
-                                    >
-                                        {group.isVerified ? <CheckCircle size={20} /> : <CheckCircle size={20} className="opacity-50" />}
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(group.id)}
-                                        title="Delete Group"
-                                        className="p-2 rounded-xl text-error bg-error/10 hover:bg-error/20 transition-all"
-                                    >
-                                        <Trash2 size={20} />
-                                    </button>
                                 </div>
                             </div>
                         ))}
-                        
-                        {filteredGroups.length === 0 && !loading && (
-                            <div className="text-center p-8 text-gray-600 text-sm">
-                                No groups found.
+                    </div>
+                )}
+
+                {view === 'users' && (
+                    <div className="space-y-3">
+                        {users.map(u => (
+                            <div key={u.uid} className="bg-dark-light p-3 rounded-2xl border border-white/5">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="font-bold text-sm">{u.displayName}</div>
+                                        <div className="text-[10px] text-gray-400">{u.email}</div>
+                                        <div className="text-xs font-bold text-success mt-1">Bal: ${u.balance?.toFixed(2)}</div>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => handleUserAction(u.uid, 'ban')} className={`px-2 py-1 rounded text-[10px] font-bold ${u.isBanned ? 'bg-error text-white' : 'bg-white/5 text-gray-400'}`}>{u.isBanned ? 'Unban' : 'Ban'}</button>
+                                        <button onClick={() => handleUserAction(u.uid, 'freeze')} className={`px-2 py-1 rounded text-[10px] font-bold ${u.monetizationFrozen ? 'bg-warning text-black' : 'bg-white/5 text-gray-400'}`}>Freeze</button>
+                                        <button onClick={() => setEditingUser(editingUser === u.uid ? null : u.uid)} className="px-2 py-1 bg-primary/20 text-primary rounded text-[10px] font-bold">$$</button>
+                                    </div>
+                                </div>
+                                {editingUser === u.uid && (
+                                    <div className="flex gap-2 mt-2">
+                                        <input type="number" placeholder="+/- Amount" className="w-full bg-dark rounded p-2 text-xs" value={balanceAdj} onChange={e => setBalanceAdj(e.target.value)} />
+                                        <Button size="sm" onClick={() => handleAddMoney(u.uid)}>Apply</Button>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        ))}
                     </div>
-                  </>
-                ) : (
-                  <div className="bg-dark-light p-6 rounded-2xl border border-white/5 shadow-lg">
-                    <div className="flex items-center gap-3 mb-6">
-                      <div className="p-3 bg-primary/10 rounded-xl text-primary">
-                        <BellRing size={24} />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold">Broadcast Notification</h2>
-                        <p className="text-xs text-gray-400">Send alerts to all users instantly.</p>
-                      </div>
+                )}
+
+                {view === 'withdrawals' && (
+                    <div className="space-y-3">
+                        {withdrawals.filter(w => w.status === 'pending').length === 0 && <p className="text-center text-gray-500 text-sm">No pending requests.</p>}
+                        {withdrawals.filter(w => w.status === 'pending').map(w => (
+                            <div key={w.id} className="bg-dark-light p-4 rounded-2xl border border-white/5">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="font-bold text-sm">{w.userName}</span>
+                                    <span className="text-success font-bold text-lg">${w.amount}</span>
+                                </div>
+                                <div className="text-xs text-gray-400 mb-4 bg-dark p-2 rounded">
+                                    <div>Method: <span className="text-white">{w.method}</span></div>
+                                    <div>Number: <span className="text-white font-mono">{w.accountNumber}</span></div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button onClick={() => handleWithdrawal(w, 'paid')} className="bg-success hover:bg-success/90">Mark Paid</Button>
+                                    <Button onClick={() => handleWithdrawal(w, 'rejected')} variant="danger">Reject</Button>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                    
-                    <form onSubmit={handleSendNotification} className="space-y-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase">Title</label>
-                        <input
-                          required
-                          className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm focus:border-primary focus:outline-none"
-                          placeholder="e.g. System Maintenance"
-                          value={notifTitle}
-                          onChange={e => setNotifTitle(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase">Message</label>
-                        <textarea
-                          required
-                          rows={3}
-                          className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm focus:border-primary focus:outline-none resize-none"
-                          placeholder="What do you want to tell everyone?"
-                          value={notifMsg}
-                          onChange={e => setNotifMsg(e.target.value)}
-                        />
-                      </div>
+                )}
 
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-400 uppercase">Type</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {['system', 'update', 'alert'].map(t => (
-                            <button
-                              key={t}
-                              type="button"
-                              onClick={() => setNotifType(t as any)}
-                              className={`py-2 rounded-lg text-xs font-bold capitalize border ${notifType === t ? 'bg-primary border-primary' : 'bg-dark border-white/10 text-gray-400'}`}
-                            >
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <Button fullWidth size="lg" className="mt-4 gap-2">
-                         <Send size={18} /> Send Broadcast
-                      </Button>
-                    </form>
-                  </div>
+                {view === 'notify' && (
+                    <div className="bg-dark-light p-6 rounded-2xl border border-white/5">
+                         <h2 className="text-lg font-bold mb-4">Broadcast</h2>
+                         <div className="space-y-4">
+                            <input className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm" placeholder="Title" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} />
+                            <textarea className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm" placeholder="Message" value={notifMsg} onChange={e => setNotifMsg(e.target.value)} />
+                            <Button fullWidth onClick={(e) => {
+                                e.preventDefault();
+                                createBroadcastNotification(notifTitle, notifMsg, notifType);
+                                alert('Sent');
+                                setNotifTitle('');
+                                setNotifMsg('');
+                            }}>Send Broadcast</Button>
+                         </div>
+                    </div>
                 )}
             </div>
         </div>

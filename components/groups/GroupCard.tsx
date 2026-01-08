@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Group } from '../../lib/types';
-import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye } from 'lucide-react';
+import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye, Clock } from 'lucide-react';
 import { formatCompactNumber } from '../../lib/utils';
 import Button from '../ui/Button';
-import { trackGroupClick } from '../../lib/db';
+import { trackGroupClick, trackGroupView } from '../../lib/db';
+import { useAuth } from '../../context/AuthContext';
 
 interface GroupCardProps {
   group: Group;
@@ -11,11 +12,25 @@ interface GroupCardProps {
 }
 
 const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
-  
+  const { user } = useAuth();
+  const isOwner = user?.uid === group.createdBy;
+
+  // Track view on mount (intersection observer would be better for list, but simple useEffect for now)
+  useEffect(() => {
+    // Basic debounce/duplicate prevention could be here, but for now just call
+    // Logic inside db.ts prevents owner views
+    trackGroupView(group.id, group.createdBy, user?.uid);
+  }, [group.id, group.createdBy, user?.uid]);
+
   const handleJoin = async () => {
-    // Optimistic tracking
-    trackGroupClick(group.id).catch(console.error);
+    trackGroupClick(group.id, group.createdBy, user?.uid).catch(console.error);
     window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
+  };
+
+  const getStatusBadge = () => {
+    if (group.status === 'pending') return <span className="text-warning bg-warning/10 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1"><Clock size={10} /> Pending</span>;
+    if (group.status === 'rejected') return <span className="text-error bg-error/10 px-2 py-0.5 rounded text-[10px] font-bold">Rejected</span>;
+    return null;
   };
 
   return (
@@ -37,11 +52,14 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
       
       <div className="flex-1 flex flex-col justify-between min-w-0">
         <div>
-          <div className="flex items-center gap-1 mb-1 pr-6">
-            <h3 className="font-bold text-base text-white truncate">{group.name}</h3>
-            {group.isVerified && (
-              <CheckCircle size={14} className="text-verified shrink-0" fill="currentColor" color="white" />
-            )}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1 pr-2 min-w-0">
+               <h3 className="font-bold text-base text-white truncate">{group.name}</h3>
+               {group.isVerified && (
+                  <CheckCircle size={14} className="text-verified shrink-0" fill="currentColor" color="white" />
+               )}
+            </div>
+            {getStatusBadge()}
           </div>
           <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed mb-2">
             {group.description}

@@ -9,9 +9,12 @@ import Auth from './pages/Auth';
 import AddGroup from './pages/AddGroup';
 import Admin from './pages/Admin';
 import Notifications from './pages/Notifications';
+import CreatorDashboard from './pages/CreatorDashboard';
+import Cashout from './pages/Cashout';
+import Settings from './pages/Settings';
+import EditProfile from './pages/EditProfile';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Updates to handle redirect back to original location
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
@@ -46,6 +49,10 @@ export default function App() {
             <Route path="/my-groups" element={<ProtectedRoute><MyGroups /></ProtectedRoute>} />
             <Route path="/add-group" element={<ProtectedRoute><AddGroup /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
+            <Route path="/cashout" element={<ProtectedRoute><Cashout /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
             
             {/* Catch all redirect */}
             <Route path="*" element={<Navigate to="/" />} />
