@@ -1,17 +1,20 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
-import { LogOut, Settings, Shield, User, ChevronRight, DollarSign, Wallet } from 'lucide-react';
+import { LogOut, Settings, Shield, User, ChevronRight, DollarSign, Wallet, Eye, MousePointerClick } from 'lucide-react';
 import { useRealtimeGroups } from '../hooks/useRealtime';
 
 export default function Profile() {
   const { user, logout } = useAuth();
-  // Get users groups to calculate earnings (mock logic)
   const { groups } = useRealtimeGroups(undefined, user?.uid);
   
-  const paidGroups = groups.filter(g => g.accessType === 'Paid');
-  // Mock earnings calculation: $5 * number of paid groups * random multiplier
-  const mockEarnings = paidGroups.length * 155; 
+  // Monetization rates
+  const RATE_PER_VIEW = 0.005;
+  const RATE_PER_CLICK = 0.02;
+
+  const totalViews = groups.reduce((acc, curr) => acc + (curr.views || 0), 0);
+  const totalClicks = groups.reduce((acc, curr) => acc + (curr.clicks || 0), 0);
+  const earnings = (totalViews * RATE_PER_VIEW) + (totalClicks * RATE_PER_CLICK);
 
   if (!user) {
       return (
@@ -46,9 +49,24 @@ export default function Profile() {
                 <Wallet className="text-success" size={20} />
                 <h3 className="font-bold text-white">Creator Earnings</h3>
              </div>
-             <div className="text-3xl font-bold text-white mb-1">${mockEarnings.toFixed(2)}</div>
-             <p className="text-xs text-gray-400 mb-4">Total revenue from {paidGroups.length} paid groups</p>
-             <Button size="sm" className="w-full bg-white/5 hover:bg-white/10 text-white border-0">
+             <div className="text-3xl font-bold text-white mb-4">${earnings.toFixed(2)}</div>
+             
+             <div className="grid grid-cols-2 gap-4 mb-4">
+                <div className="bg-white/5 p-3 rounded-xl">
+                   <div className="flex items-center gap-1 text-xs text-gray-400 mb-1">
+                      <Eye size={12} /> Views
+                   </div>
+                   <div className="font-bold">{totalViews}</div>
+                </div>
+                <div className="bg-white/5 p-3 rounded-xl">
+                   <div className="flex items-center gap-1 text-xs text-gray-400 mb-1">
+                      <MousePointerClick size={12} /> Clicks
+                   </div>
+                   <div className="font-bold">{totalClicks}</div>
+                </div>
+             </div>
+
+             <Button size="sm" className="w-full bg-success hover:bg-success/90 text-white border-0 shadow-lg shadow-success/20">
                 Cash Out
              </Button>
          </div>
@@ -92,7 +110,7 @@ export default function Profile() {
         Sign Out
       </Button>
       
-      <p className="text-center text-xs text-gray-600 pb-8">Version 1.1.0 (Live)</p>
+      <p className="text-center text-xs text-gray-600 pb-8">Version 1.2.0 (Realtime)</p>
     </div>
   );
 }

@@ -1,36 +1,25 @@
 import React from 'react';
 import { Group } from '../../lib/types';
-import { Users, CheckCircle, ExternalLink, Lock } from 'lucide-react';
+import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye } from 'lucide-react';
 import { formatCompactNumber } from '../../lib/utils';
 import Button from '../ui/Button';
+import { trackGroupClick } from '../../lib/db';
 
 interface GroupCardProps {
   group: Group;
+  showStats?: boolean;
 }
 
-const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
-  const isPaid = group.accessType === 'Paid';
-
-  const handleJoin = () => {
-    if (isPaid) {
-        // In a real app, this would trigger a payment flow
-        const confirmPayment = window.confirm(`This is a paid group. Proceed to pay $${group.price}?`);
-        if(confirmPayment) {
-             window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
-        }
-    } else {
-        window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
-    }
+const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
+  
+  const handleJoin = async () => {
+    // Optimistic tracking
+    trackGroupClick(group.id).catch(console.error);
+    window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
   };
 
   return (
     <div className="bg-dark-light rounded-2xl p-4 border border-white/5 hover:border-primary/30 transition-all active:scale-[0.99] flex gap-4 relative overflow-hidden">
-      {isPaid && (
-          <div className="absolute top-0 right-0 bg-success text-white text-[10px] font-bold px-2 py-1 rounded-bl-xl z-10">
-              ${group.price} USD
-          </div>
-      )}
-
       <div className="relative shrink-0">
         <img 
           src={group.iconUrl || 'https://picsum.photos/100'} 
@@ -66,17 +55,23 @@ const GroupCard: React.FC<GroupCardProps> = ({ group }) => {
           </div>
         </div>
         
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-end mt-2 items-center gap-3">
+           {showStats && (
+             <div className="flex items-center gap-3 mr-auto">
+                <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <Eye size={12} /> {formatCompactNumber(group.views || 0)}
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <MousePointerClick size={12} /> {formatCompactNumber(group.clicks || 0)}
+                </div>
+             </div>
+           )}
            <Button 
             size="sm" 
-            className={`h-7 text-xs px-3 rounded-lg gap-1 ${isPaid ? 'bg-success hover:bg-success/90' : ''}`} 
+            className="h-7 text-xs px-3 rounded-lg gap-1" 
             onClick={handleJoin}
            >
-             {isPaid ? (
-                 <>Pay to Join <Lock size={10} /></>
-             ) : (
-                 <>Join <ExternalLink size={10} /></>
-             )}
+             Join <ExternalLink size={10} />
            </Button>
         </div>
       </div>

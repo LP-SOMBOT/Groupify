@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { updateGroupVerification, deleteGroup, createNotification } from '../lib/firestore';
+import { updateGroupVerification, deleteGroup, createBroadcastNotification } from '../lib/db';
 import { useAdminRealtimeGroups } from '../hooks/useRealtime';
 import { Group } from '../lib/types';
 import Button from '../components/ui/Button';
@@ -34,7 +34,7 @@ export default function Admin() {
         if (!confirm(`Change verification status for "${group.name}"?`)) return;
         
         try {
-            await updateGroupVerification(group.id, !group.isVerified);
+            await updateGroupVerification(group.id, !group.isVerified, group.name, group.createdBy);
         } catch (error) {
             console.error(error);
             alert("Failed to update status");
@@ -59,8 +59,8 @@ export default function Admin() {
       if (!confirm('Broadcast this notification to ALL users?')) return;
       
       try {
-        await createNotification(notifTitle, notifMsg, notifType);
-        alert('Notification sent!');
+        await createBroadcastNotification(notifTitle, notifMsg, notifType);
+        alert('Broadcast sent!');
         setNotifTitle('');
         setNotifMsg('');
       } catch (e) {
@@ -188,7 +188,6 @@ export default function Admin() {
                                     </div>
                                     <div className="flex items-center gap-2 text-[10px] text-gray-500">
                                         <span className="truncate max-w-[100px]">ID: {group.id}</span>
-                                        <span className={group.accessType === 'Paid' ? 'text-success font-bold' : ''}>{group.accessType || 'Free'}</span>
                                         <span>•</span>
                                         <span>{new Date(group.createdAt).toLocaleDateString()}</span>
                                     </div>

@@ -4,7 +4,7 @@ export interface UserProfile {
   email: string | null;
   photoURL: string | null;
   bio?: string;
-  joinedAt: Date;
+  joinedAt: number;
 }
 
 export interface Group {
@@ -19,8 +19,11 @@ export interface Group {
   tags: string[];
   createdBy: string;
   createdAt: number;
-  // Monetization fields
-  accessType: 'Free' | 'Paid';
+  // Monetization fields (Views/Clicks)
+  views: number;
+  clicks: number;
+  // Monetization config
+  accessType?: 'Free' | 'Paid';
   price?: number;
   currency?: string;
 }
@@ -37,7 +40,7 @@ export interface CreateGroupData {
   category: Category;
   inviteLink: string;
   tags: string[];
-  accessType: 'Free' | 'Paid';
+  accessType?: 'Free' | 'Paid';
   price?: number;
 }
 
@@ -46,5 +49,8 @@ export interface AppNotification {
   title: string;
   message: string;
   type: 'system' | 'update' | 'alert';
-  createdAt: number;
+  timestamp: number;
+  isBroadcast: boolean; // True for admin messages, False for personal system messages
+  targetUserId?: string; // If personal
+  read: boolean;
 }

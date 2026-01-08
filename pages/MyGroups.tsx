@@ -56,7 +56,7 @@ export default function MyGroups() {
           </div>
           <div className="space-y-3">
               {groups.map(group => (
-                  <GroupCard key={group.id} group={group} />
+                  <GroupCard key={group.id} group={group} showStats={true} />
               ))}
           </div>
       </div>
