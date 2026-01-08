@@ -1,26 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Search, Filter } from 'lucide-react';
 import { CATEGORIES } from '../lib/types';
-import { fetchGroups } from '../lib/firestore';
+import { useRealtimeGroups } from '../hooks/useRealtime';
 import GroupCard from '../components/groups/GroupCard';
 import { cn } from '../lib/utils';
-import { Group } from '../lib/types';
 
 export default function Explore() {
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const data = await fetchGroups(activeCategory);
-      setGroups(data);
-      setLoading(false);
-    }
-    load();
-  }, [activeCategory]);
+  const { groups, loading } = useRealtimeGroups(activeCategory);
 
   const filteredGroups = groups.filter(g => 
     g.name.toLowerCase().includes(searchQuery.toLowerCase()) || 

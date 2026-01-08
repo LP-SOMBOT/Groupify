@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { createGroup } from '../lib/firestore';
 import { CATEGORIES, Category } from '../lib/types';
 import Button from '../components/ui/Button';
-import { ChevronLeft, Info, Hash, Link as LinkIcon, Layers } from 'lucide-react';
+import { ChevronLeft, Hash, Link as LinkIcon, Layers, DollarSign, Lock, Globe } from 'lucide-react';
 
 export default function AddGroup() {
   const { user } = useAuth();
@@ -16,10 +16,11 @@ export default function AddGroup() {
     description: '',
     inviteLink: '',
     category: 'Technology' as Category,
-    tags: ''
+    tags: '',
+    accessType: 'Free' as 'Free' | 'Paid',
+    price: ''
   });
 
-  // Safe check, though ProtectedRoute should handle this
   if (!user) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,7 +38,9 @@ export default function AddGroup() {
         description: formData.description,
         inviteLink: formData.inviteLink,
         category: formData.category,
-        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean)
+        tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
+        accessType: formData.accessType,
+        price: formData.accessType === 'Paid' ? parseFloat(formData.price) : 0
       }, user.uid);
       
       navigate('/my-groups');
@@ -59,6 +62,8 @@ export default function AddGroup() {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-5">
+        
+        {/* Basic Info */}
         <div className="space-y-1">
           <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Group Name</label>
           <div className="relative">
@@ -92,6 +97,59 @@ export default function AddGroup() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Monetization Section */}
+        <div className="bg-dark-light/50 p-4 rounded-xl border border-white/5 space-y-4">
+            <h3 className="text-sm font-bold flex items-center gap-2 text-white">
+                <DollarSign size={16} className="text-success" /> Monetization
+            </h3>
+            
+            <div className="grid grid-cols-2 gap-3">
+                <button
+                    type="button"
+                    onClick={() => setFormData({...formData, accessType: 'Free'})}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${
+                        formData.accessType === 'Free' 
+                        ? 'bg-primary/20 border-primary text-white' 
+                        : 'bg-dark border-white/10 text-gray-400'
+                    }`}
+                >
+                    <Globe size={20} />
+                    <span className="text-xs font-bold">Free Access</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setFormData({...formData, accessType: 'Paid'})}
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all ${
+                        formData.accessType === 'Paid' 
+                        ? 'bg-success/20 border-success text-white' 
+                        : 'bg-dark border-white/10 text-gray-400'
+                    }`}
+                >
+                    <Lock size={20} />
+                    <span className="text-xs font-bold">Paid Entry</span>
+                </button>
+            </div>
+
+            {formData.accessType === 'Paid' && (
+                 <div className="space-y-1 animate-fade-in">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Entry Price (USD)</label>
+                    <div className="relative">
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-success font-bold">$</div>
+                        <input
+                            required
+                            type="number"
+                            min="1"
+                            placeholder="5.00"
+                            className="w-full bg-dark border border-white/10 rounded-xl h-12 pl-8 pr-4 text-sm focus:outline-none focus:border-success/50 text-white placeholder:text-gray-600"
+                            value={formData.price}
+                            onChange={e => setFormData({...formData, price: e.target.value})}
+                        />
+                    </div>
+                    <p className="text-[10px] text-gray-500 ml-1">ConnectSphere takes a 5% platform fee.</p>
+                </div>
+            )}
         </div>
 
         <div className="space-y-1">

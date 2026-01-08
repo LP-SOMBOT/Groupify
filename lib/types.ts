@@ -18,7 +18,11 @@ export interface Group {
   memberCount: number;
   tags: string[];
   createdBy: string;
-  createdAt: number; // Storing as millis for easier serialization
+  createdAt: number;
+  // Monetization fields
+  accessType: 'Free' | 'Paid';
+  price?: number;
+  currency?: string;
 }
 
 export type Category = 'Technology' | 'Education' | 'Entertainment' | 'Business' | 'Social' | 'Other';
@@ -33,6 +37,8 @@ export interface CreateGroupData {
   category: Category;
   inviteLink: string;
   tags: string[];
+  accessType: 'Free' | 'Paid';
+  price?: number;
 }
 
 export interface AppNotification {

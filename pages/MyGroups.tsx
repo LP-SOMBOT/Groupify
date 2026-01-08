@@ -1,28 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { PlusCircle, Layers, Loader2 } from 'lucide-react';
 import Button from '../components/ui/Button';
-import { Link, useNavigate } from 'react-router-dom';
-import { fetchUserGroups } from '../lib/firestore';
-import { Group } from '../lib/types';
+import { useNavigate } from 'react-router-dom';
+import { useRealtimeGroups } from '../hooks/useRealtime';
 import GroupCard from '../components/groups/GroupCard';
 
 export default function MyGroups() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      if (user) {
-        const data = await fetchUserGroups(user.uid);
-        setGroups(data);
-      }
-      setLoading(false);
-    }
-    load();
-  }, [user]);
+  // Pass null for category, and user.uid to filter by creator
+  const { groups, loading } = useRealtimeGroups(undefined, user?.uid);
 
   // Loading State
   if (loading) {

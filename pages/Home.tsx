@@ -1,26 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fetchGroups } from '../lib/firestore';
+import { useRealtimeGroups } from '../hooks/useRealtime';
 import GroupCard from '../components/groups/GroupCard';
 import { Flame, TrendingUp, Plus } from 'lucide-react';
 import Button from '../components/ui/Button';
 import { useNavigate } from 'react-router-dom';
-import { Group } from '../lib/types';
 
 export default function Home() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [featuredGroups, setFeaturedGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const data = await fetchGroups();
-      setFeaturedGroups(data);
-      setLoading(false);
-    }
-    load();
-  }, []);
+  const { groups: featuredGroups, loading } = useRealtimeGroups();
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">

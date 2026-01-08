@@ -1,22 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { fetchNotifications } from '../lib/firestore';
-import { AppNotification } from '../lib/types';
+import React from 'react';
+import { useRealtimeNotifications } from '../hooks/useRealtime';
 import { Bell, Info, AlertTriangle, Zap, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { notifications, loading } = useRealtimeNotifications();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    async function load() {
-      const data = await fetchNotifications();
-      setNotifications(data);
-      setLoading(false);
-    }
-    load();
-  }, []);
 
   const getIcon = (type: string) => {
     switch (type) {

@@ -18,6 +18,7 @@ import { Group, CreateGroupData, AppNotification } from './types';
 const GROUPS_COLLECTION = 'groups';
 const NOTIFICATIONS_COLLECTION = 'notifications';
 
+// Legacy fetch - prefer hooks/useRealtime.ts for UI components
 export const fetchGroups = async (category?: string): Promise<Group[]> => {
   try {
     let q;
@@ -78,12 +79,17 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     createdBy: userId,
     createdAt: serverTimestamp(),
     isVerified: false,
-    memberCount: Math.floor(Math.random() * 100) + 1, // Mock member count start
-    iconUrl: `https://ui-avatars.com/api/?name=${data.name}&background=random&color=fff&size=200`
+    memberCount: Math.floor(Math.random() * 100) + 1,
+    iconUrl: `https://ui-avatars.com/api/?name=${data.name}&background=random&color=fff&size=200`,
+    // Ensure monetization defaults
+    accessType: data.accessType || 'Free',
+    price: data.price || 0,
+    currency: 'USD'
   });
   return docRef.id;
 };
 
+// Legacy fetch - prefer hooks/useRealtime.ts
 export const fetchNotifications = async (): Promise<AppNotification[]> => {
   try {
     const q = query(
@@ -116,7 +122,6 @@ export const createNotification = async (title: string, message: string, type: '
 
 export const getAllGroupsForAdmin = async (): Promise<Group[]> => {
   try {
-    // Fetch all groups without limit, ordered by newest
     const q = query(collection(db, GROUPS_COLLECTION), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ 

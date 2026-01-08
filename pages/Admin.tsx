@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { getAllGroupsForAdmin, updateGroupVerification, deleteGroup, createNotification } from '../lib/firestore';
+import React, { useState } from 'react';
+import { updateGroupVerification, deleteGroup, createNotification } from '../lib/firestore';
+import { useAdminRealtimeGroups } from '../hooks/useRealtime';
 import { Group } from '../lib/types';
 import Button from '../components/ui/Button';
-import { Shield, Trash2, CheckCircle, XCircle, RefreshCw, LogOut, Search, BellRing, Send } from 'lucide-react';
+import { Shield, Trash2, CheckCircle, RefreshCw, LogOut, Search, BellRing, Send } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Admin() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [pin, setPin] = useState('');
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [loading, setLoading] = useState(false);
+    const { groups, loading } = useAdminRealtimeGroups();
     const [filter, setFilter] = useState('');
     const [view, setView] = useState<'groups' | 'notify'>('groups');
     const navigate = useNavigate();
@@ -23,33 +23,21 @@ export default function Admin() {
         e.preventDefault();
         if (pin === '1234') {
             setIsAuthenticated(true);
-            fetchData();
         } else {
             alert('Invalid PIN');
             setPin('');
         }
     }
 
-    const fetchData = async () => {
-        setLoading(true);
-        const data = await getAllGroupsForAdmin();
-        setGroups(data);
-        setLoading(false);
-    }
-
     const handleToggleVerify = async (group: Group) => {
         // eslint-disable-next-line no-restricted-globals
         if (!confirm(`Change verification status for "${group.name}"?`)) return;
-        
-        // Optimistic update
-        setGroups(prev => prev.map(g => g.id === group.id ? { ...g, isVerified: !g.isVerified } : g));
         
         try {
             await updateGroupVerification(group.id, !group.isVerified);
         } catch (error) {
             console.error(error);
             alert("Failed to update status");
-            fetchData(); // Revert on error
         }
     }
 
@@ -57,15 +45,11 @@ export default function Admin() {
         // eslint-disable-next-line no-restricted-globals
         if (!confirm('Are you sure you want to PERMANENTLY delete this group?')) return;
         
-        // Optimistic update
-        setGroups(prev => prev.filter(g => g.id !== id));
-
         try {
             await deleteGroup(id);
         } catch (error) {
             console.error(error);
             alert("Failed to delete group");
-            fetchData(); // Revert on error
         }
     }
 
@@ -130,9 +114,9 @@ export default function Admin() {
                     <span className="tracking-tight">Super Admin</span>
                 </h1>
                 <div className="flex gap-2">
-                     <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white" title="Refresh">
-                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-                     </button>
+                     <div className="p-2">
+                        <RefreshCw size={20} className={loading ? "animate-spin text-gray-400" : "text-gray-400"} />
+                     </div>
                      <button onClick={() => setIsAuthenticated(false)} className="p-2 hover:bg-white/10 rounded-lg text-error transition-colors" title="Logout">
                         <LogOut size={20} />
                      </button>
@@ -204,6 +188,7 @@ export default function Admin() {
                                     </div>
                                     <div className="flex items-center gap-2 text-[10px] text-gray-500">
                                         <span className="truncate max-w-[100px]">ID: {group.id}</span>
+                                        <span className={group.accessType === 'Paid' ? 'text-success font-bold' : ''}>{group.accessType || 'Free'}</span>
                                         <span>•</span>
                                         <span>{new Date(group.createdAt).toLocaleDateString()}</span>
                                     </div>
