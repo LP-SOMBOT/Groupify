@@ -63,6 +63,7 @@ export default function Admin() {
     }
 
     // --- Stats Calculation ---
+    // Safe access with defaults using || 0
     const totalRevenue = users.reduce((acc, u) => acc + (u.balance || 0), 0);
     const totalViews = groups.reduce((acc, g) => acc + (g.views || 0), 0);
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
@@ -97,7 +98,7 @@ export default function Admin() {
             if(!isNaN(v)) updates.views = v;
             if(!isNaN(c)) updates.clicks = c;
             await updateGroup(selectedGroup.id, updates);
-            showToast('Stats updated', 'success');
+            showToast('Stats updated & Revenue recalculated', 'success');
             setSelectedGroup(null);
         }
     }
@@ -173,7 +174,7 @@ export default function Admin() {
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 <header className="h-16 border-b border-white/5 flex items-center px-4 justify-between bg-dark/50 backdrop-blur-md md:justify-end">
                     <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 text-gray-400"><Menu/></button>
-                    <div className="text-xs font-bold text-gray-500">v3.0.0</div>
+                    <div className="text-xs font-bold text-gray-500">v3.0.1</div>
                 </header>
 
                 <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
@@ -213,7 +214,8 @@ export default function Admin() {
                                                     <div className="text-[10px] text-gray-400">{u.email}</div>
                                                 </div>
                                             </div>
-                                            <div className="text-xs font-mono">${u.balance.toFixed(2)}</div>
+                                            {/* Fix: Safely access balance with fallback */}
+                                            <div className="text-xs font-mono">${(u.balance || 0).toFixed(2)}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -253,15 +255,17 @@ export default function Admin() {
                                         <div>
                                             <div className="font-bold text-sm">{g.name}</div>
                                             <div className="text-[10px] text-gray-400 flex gap-2">
-                                                <span className="flex items-center gap-1"><Eye size={10}/> {g.views}</span>
-                                                <span className="flex items-center gap-1"><MousePointerClick size={10}/> {g.clicks}</span>
+                                                {/* Fix: Safely access views/clicks with fallback */}
+                                                <span className="flex items-center gap-1"><Eye size={10}/> {g.views || 0}</span>
+                                                <span className="flex items-center gap-1"><MousePointerClick size={10}/> {g.clicks || 0}</span>
                                             </div>
                                         </div>
                                     </div>
                                     <Button size="sm" onClick={() => {
                                         setSelectedGroup(g);
-                                        setEditViews(g.views.toString());
-                                        setEditClicks(g.clicks.toString());
+                                        // Fix: Safely convert to string with fallback
+                                        setEditViews((g.views || 0).toString());
+                                        setEditClicks((g.clicks || 0).toString());
                                     }}>Edit</Button>
                                 </div>
                             ))}
@@ -320,7 +324,8 @@ export default function Admin() {
                 {selectedUser && (
                     <div className="space-y-4">
                          <div className="text-center">
-                            <div className="text-2xl font-bold">${selectedUser.balance.toFixed(2)}</div>
+                            {/* Fix: Safely access balance with fallback */}
+                            <div className="text-2xl font-bold">${(selectedUser.balance || 0).toFixed(2)}</div>
                             <div className="text-xs text-gray-500">Current Balance</div>
                          </div>
                          <div className="flex gap-2">
