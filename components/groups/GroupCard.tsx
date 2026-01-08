@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
 import { Group } from '../../lib/types';
-import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye, Clock } from 'lucide-react';
+import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye, Clock, Edit, Trash, AlertOctagon } from 'lucide-react';
 import { formatCompactNumber } from '../../lib/utils';
 import Button from '../ui/Button';
-import { trackGroupClick, trackGroupView } from '../../lib/db';
+import { trackGroupClick, trackGroupView, deleteGroup } from '../../lib/db';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 interface GroupCardProps {
   group: Group;
@@ -13,12 +14,10 @@ interface GroupCardProps {
 
 const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isOwner = user?.uid === group.createdBy;
 
-  // Track view on mount (intersection observer would be better for list, but simple useEffect for now)
   useEffect(() => {
-    // Basic debounce/duplicate prevention could be here, but for now just call
-    // Logic inside db.ts prevents owner views
     trackGroupView(group.id, group.createdBy, user?.uid);
   }, [group.id, group.createdBy, user?.uid]);
 
@@ -27,14 +26,21 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
     window.open(group.inviteLink, '_blank', 'noopener,noreferrer');
   };
 
+  const handleDelete = async () => {
+      if(confirm('Are you sure you want to delete your group?')) {
+          await deleteGroup(group.id);
+      }
+  }
+
   const getStatusBadge = () => {
+    if (group.isGuidelineViolation) return <span className="text-error bg-error/10 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1"><AlertOctagon size={10} /> Violation</span>;
     if (group.status === 'pending') return <span className="text-warning bg-warning/10 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1"><Clock size={10} /> Pending</span>;
     if (group.status === 'rejected') return <span className="text-error bg-error/10 px-2 py-0.5 rounded text-[10px] font-bold">Rejected</span>;
     return null;
   };
 
   return (
-    <div className="bg-dark-light rounded-2xl p-4 border border-white/5 hover:border-primary/30 transition-all active:scale-[0.99] flex gap-4 relative overflow-hidden">
+    <div className={`bg-dark-light rounded-2xl p-4 border transition-all active:scale-[0.99] flex gap-4 relative overflow-hidden ${group.isGuidelineViolation ? 'border-error/50 bg-error/5' : 'border-white/5 hover:border-primary/30'}`}>
       <div className="relative shrink-0">
         <img 
           src={group.iconUrl || 'https://picsum.photos/100'} 
@@ -64,13 +70,6 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
           <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed mb-2">
             {group.description}
           </p>
-          <div className="flex flex-wrap gap-1">
-            {group.tags.slice(0, 2).map((tag) => (
-              <span key={tag} className="px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-gray-400 border border-white/5">
-                #{tag}
-              </span>
-            ))}
-          </div>
         </div>
         
         <div className="flex justify-end mt-2 items-center gap-3">
@@ -84,13 +83,22 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
                 </div>
              </div>
            )}
-           <Button 
-            size="sm" 
-            className="h-7 text-xs px-3 rounded-lg gap-1" 
-            onClick={handleJoin}
-           >
-             Join <ExternalLink size={10} />
-           </Button>
+
+           {isOwner && group.status === 'approved' ? (
+               <div className="flex gap-2">
+                   <button onClick={() => navigate(`/edit-group/${group.id}`)} className="p-1.5 bg-white/10 rounded-lg text-gray-300"><Edit size={14}/></button>
+                   <button onClick={handleDelete} className="p-1.5 bg-error/10 text-error rounded-lg"><Trash size={14}/></button>
+               </div>
+           ) : (
+                <Button 
+                    size="sm" 
+                    className="h-7 text-xs px-3 rounded-lg gap-1" 
+                    onClick={handleJoin}
+                    disabled={group.isGuidelineViolation} // Disable join if violation
+                >
+                    Join <ExternalLink size={10} />
+                </Button>
+           )}
         </div>
       </div>
     </div>

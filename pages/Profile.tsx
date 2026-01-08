@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
-import { LogOut, Settings, Shield, User, ChevronRight, BarChart3, Wallet } from 'lucide-react';
+import { LogOut, Settings, Shield, User, ChevronRight, BarChart3, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
@@ -28,7 +28,10 @@ export default function Profile() {
           />
         </div>
         <h2 className="text-xl font-bold text-white">{profile?.displayName || user.displayName || 'User'}</h2>
-        <p className="text-sm text-gray-400">{user.email}</p>
+        <p className="text-sm text-gray-400 text-center max-w-xs mt-1">
+            {profile?.bio || "No bio yet."}
+        </p>
+        {profile?.isBetaTester && <span className="mt-2 text-[10px] bg-secondary/20 text-secondary border border-secondary/50 px-2 py-0.5 rounded-full font-bold uppercase tracking-wide">Beta Tester</span>}
       </div>
 
       {/* Creator Dashboard Entry */}
@@ -71,10 +74,10 @@ export default function Profile() {
       <div className="space-y-2">
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Support</h3>
         <div className="bg-dark-light rounded-2xl overflow-hidden">
-           <button className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors" onClick={() => window.open('https://google.com', '_blank')}>
+           <button className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors" onClick={() => window.open('https://wa.me/252613982172', '_blank')}>
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-success/10 rounded-lg text-success"><Shield size={18} /></div>
-              <span className="text-sm font-medium">Privacy Policy</span>
+              <div className="p-2 bg-success/10 rounded-lg text-success"><MessageCircle size={18} /></div>
+              <span className="text-sm font-medium">Contact Support</span>
             </div>
             <ChevronRight size={16} className="text-gray-500" />
           </button>
@@ -86,7 +89,7 @@ export default function Profile() {
         Sign Out
       </Button>
       
-      <p className="text-center text-xs text-gray-600 pb-8">Groupify v2.0</p>
+      <p className="text-center text-xs text-gray-600 pb-8">Groupify v2.1</p>
     </div>
   );
 }

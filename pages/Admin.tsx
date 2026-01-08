@@ -5,18 +5,20 @@ import {
     createBroadcastNotification, 
     adminAdjustBalance, 
     adminUpdateUser,
-    processWithdrawal
+    processWithdrawal,
+    updateGroup
 } from '../lib/db';
 import { useAdminRealtimeGroups, useRealtimeUsers, useRealtimeWithdrawals } from '../hooks/useRealtime';
 import { Group, UserProfile, WithdrawalRequest } from '../lib/types';
 import Button from '../components/ui/Button';
-import { Shield, Trash2, CheckCircle, RefreshCw, LogOut, Search, BellRing, Send, User, XCircle, DollarSign, Wallet } from 'lucide-react';
+import Modal from '../components/ui/Modal';
+import { Shield, Trash2, CheckCircle, RefreshCw, LogOut, Search, BellRing, Send, User, XCircle, DollarSign, Wallet, Eye, MousePointerClick, AlertTriangle, Edit } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Admin() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [pin, setPin] = useState('');
-    const { groups, loading: groupsLoading } = useAdminRealtimeGroups();
+    const { groups } = useAdminRealtimeGroups();
     const { users } = useRealtimeUsers();
     const { withdrawals } = useRealtimeWithdrawals();
 
@@ -24,14 +26,18 @@ export default function Admin() {
     const [view, setView] = useState<'groups' | 'users' | 'withdrawals' | 'notify'>('groups');
     const navigate = useNavigate();
 
-    // Notification Form
+    // -- Modals State --
+    const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+    const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
+    const [groupTab, setGroupTab] = useState<'details' | 'actions'>('details');
+
+    // -- Action States --
+    const [balanceAdj, setBalanceAdj] = useState('');
+    const [editViews, setEditViews] = useState('');
+    const [editClicks, setEditClicks] = useState('');
     const [notifTitle, setNotifTitle] = useState('');
     const [notifMsg, setNotifMsg] = useState('');
     const [notifType, setNotifType] = useState<'system' | 'update' | 'alert'>('system');
-
-    // User Edit State
-    const [editingUser, setEditingUser] = useState<string | null>(null);
-    const [balanceAdj, setBalanceAdj] = useState('');
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -43,56 +49,75 @@ export default function Admin() {
         }
     }
 
-    // --- Actions ---
+    // --- User Actions ---
+    const handleUserAction = async (uid: string, action: 'ban' | 'freeze' | 'beta') => {
+        if (!selectedUser) return;
+        if(action === 'ban') await adminUpdateUser(uid, { isBanned: !selectedUser.isBanned });
+        if(action === 'freeze') await adminUpdateUser(uid, { monetizationFrozen: !selectedUser.monetizationFrozen });
+        if(action === 'beta') await adminUpdateUser(uid, { isBetaTester: !selectedUser.isBetaTester });
+        // Close modal to refresh or let realtime handle it? Realtime will update `selectedUser` if we refetch or use effect, 
+        // but simplest is to close or rely on parent updates. Ideally `users` prop updates.
+    }
 
+    const handleAddMoney = async () => {
+        if (!selectedUser) return;
+        const amount = parseFloat(balanceAdj);
+        if(isNaN(amount)) return;
+        await adminAdjustBalance(selectedUser.uid, amount);
+        setBalanceAdj('');
+        alert('Balance updated');
+    }
+
+    // --- Group Actions ---
     const handleGroupStatus = async (group: Group, status: 'approved' | 'rejected') => {
         if (!confirm(`${status === 'approved' ? 'Approve' : 'Reject'} "${group.name}"?`)) return;
-        try {
-            await updateGroupStatus(group.id, status, group.createdBy, group.name);
-        } catch (error) {
-            console.error(error);
-            alert("Action failed");
+        await updateGroupStatus(group.id, status, group.createdBy, group.name);
+    }
+
+    const handleUpdateGroupStats = async () => {
+        if (!selectedGroup) return;
+        const v = parseInt(editViews);
+        const c = parseInt(editClicks);
+        if (!isNaN(v) || !isNaN(c)) {
+            const updates: any = {};
+            if(!isNaN(v)) updates.views = v;
+            if(!isNaN(c)) updates.clicks = c;
+            await updateGroup(selectedGroup.id, updates);
+            alert('Stats updated');
         }
     }
 
-    const handleUserAction = async (uid: string, action: 'ban' | 'freeze') => {
-        const user = users.find(u => u.uid === uid);
-        if (!user) return;
-        if(action === 'ban') await adminUpdateUser(uid, { isBanned: !user.isBanned });
-        if(action === 'freeze') await adminUpdateUser(uid, { monetizationFrozen: !user.monetizationFrozen });
+    const handleToggleViolation = async () => {
+        if (!selectedGroup) return;
+        await updateGroup(selectedGroup.id, { isGuidelineViolation: !selectedGroup.isGuidelineViolation });
+        alert(`Group ${!selectedGroup.isGuidelineViolation ? 'marked as violation' : 'restored'}.`);
     }
 
-    const handleAddMoney = async (uid: string) => {
-        const amount = parseFloat(balanceAdj);
-        if(isNaN(amount)) return;
-        await adminAdjustBalance(uid, amount);
-        setBalanceAdj('');
-        setEditingUser(null);
+    const handleDeleteGroup = async () => {
+        if (!selectedGroup) return;
+        if (!confirm("Permanently delete this group?")) return;
+        await deleteGroup(selectedGroup.id);
+        setSelectedGroup(null);
     }
 
+    // --- Withdrawal Actions ---
     const handleWithdrawal = async (req: WithdrawalRequest, action: 'paid' | 'rejected') => {
         if(!confirm(`Mark as ${action}?`)) return;
         await processWithdrawal(req.id, action, req.userId, req.amount);
     }
 
-    // --- Renders ---
-
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4">
                 <div className="w-full max-w-xs bg-dark-light p-8 rounded-2xl border border-white/5 shadow-2xl">
-                    <div className="flex justify-center mb-6 text-error animate-pulse">
-                        <Shield size={48} />
-                    </div>
-                    <h1 className="text-xl font-bold text-center mb-2">Restricted Area</h1>
-                    <p className="text-gray-500 text-center text-xs mb-6">Super Admin Access Only</p>
+                    <h1 className="text-xl font-bold text-center mb-6">Restricted Area</h1>
                     <form onSubmit={handleLogin} className="space-y-4">
                         <input
                             type="password"
                             value={pin}
                             onChange={e => setPin(e.target.value)}
                             placeholder="Enter PIN"
-                            className="w-full bg-dark border border-white/10 rounded-xl px-4 py-3 text-center tracking-widest text-lg focus:border-error outline-none text-white"
+                            className="w-full bg-dark border border-white/10 rounded-xl px-4 py-3 text-center tracking-widest text-lg text-white"
                             autoFocus
                         />
                         <Button fullWidth variant="danger" type="submit">Access Control</Button>
@@ -113,7 +138,6 @@ export default function Admin() {
             </div>
 
             <div className="p-4 space-y-6 max-w-2xl mx-auto">
-                {/* Tabs */}
                 <div className="grid grid-cols-4 gap-1 p-1 bg-dark-light rounded-xl border border-white/5">
                   {['groups', 'users', 'withdrawals', 'notify'].map(t => (
                       <button 
@@ -126,62 +150,48 @@ export default function Admin() {
                   ))}
                 </div>
 
+                {/* --- Groups View --- */}
                 {view === 'groups' && (
                     <div className="space-y-3">
-                        <input type="text" placeholder="Search..." className="w-full bg-dark-light border border-white/5 rounded-xl p-3 text-sm" value={filter} onChange={e => setFilter(e.target.value)} />
+                        <input type="text" placeholder="Search groups..." className="w-full bg-dark-light border border-white/5 rounded-xl p-3 text-sm" value={filter} onChange={e => setFilter(e.target.value)} />
                         {groups.filter(g => g.name.toLowerCase().includes(filter.toLowerCase())).map(group => (
-                            <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex flex-col gap-3">
+                            <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <img src={group.iconUrl} className="w-10 h-10 rounded-lg object-cover" />
-                                    <div className="flex-1">
+                                    <div>
                                         <div className="font-bold text-sm">{group.name}</div>
-                                        <div className="text-[10px] text-gray-400">Status: <span className={group.status === 'pending' ? 'text-warning' : group.status === 'approved' ? 'text-success' : 'text-error'}>{group.status}</span></div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {group.status === 'pending' && (
-                                            <>
-                                                <button onClick={() => handleGroupStatus(group, 'approved')} className="p-2 bg-success/10 text-success rounded-lg"><CheckCircle size={18} /></button>
-                                                <button onClick={() => handleGroupStatus(group, 'rejected')} className="p-2 bg-error/10 text-error rounded-lg"><XCircle size={18} /></button>
-                                            </>
-                                        )}
-                                        <button onClick={() => window.open(group.inviteLink)} className="p-2 bg-white/5 text-white rounded-lg text-xs">View</button>
+                                        <div className="text-[10px] text-gray-400">{group.status} {group.isGuidelineViolation && <span className="text-error font-bold">(VIOLATION)</span>}</div>
                                     </div>
                                 </div>
+                                <Button size="sm" onClick={() => {
+                                    setSelectedGroup(group);
+                                    setEditViews(group.views.toString());
+                                    setEditClicks(group.clicks.toString());
+                                    setGroupTab('details');
+                                }}>View</Button>
                             </div>
                         ))}
                     </div>
                 )}
 
+                {/* --- Users View --- */}
                 {view === 'users' && (
                     <div className="space-y-3">
                         {users.map(u => (
-                            <div key={u.uid} className="bg-dark-light p-3 rounded-2xl border border-white/5">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <div className="font-bold text-sm">{u.displayName}</div>
-                                        <div className="text-[10px] text-gray-400">{u.email}</div>
-                                        <div className="text-xs font-bold text-success mt-1">Bal: ${u.balance?.toFixed(2)}</div>
-                                    </div>
-                                    <div className="flex gap-1">
-                                        <button onClick={() => handleUserAction(u.uid, 'ban')} className={`px-2 py-1 rounded text-[10px] font-bold ${u.isBanned ? 'bg-error text-white' : 'bg-white/5 text-gray-400'}`}>{u.isBanned ? 'Unban' : 'Ban'}</button>
-                                        <button onClick={() => handleUserAction(u.uid, 'freeze')} className={`px-2 py-1 rounded text-[10px] font-bold ${u.monetizationFrozen ? 'bg-warning text-black' : 'bg-white/5 text-gray-400'}`}>Freeze</button>
-                                        <button onClick={() => setEditingUser(editingUser === u.uid ? null : u.uid)} className="px-2 py-1 bg-primary/20 text-primary rounded text-[10px] font-bold">$$</button>
-                                    </div>
+                            <div key={u.uid} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div>
+                                    <div className="font-bold text-sm">{u.displayName}</div>
+                                    <div className="text-[10px] text-gray-400">{u.email}</div>
                                 </div>
-                                {editingUser === u.uid && (
-                                    <div className="flex gap-2 mt-2">
-                                        <input type="number" placeholder="+/- Amount" className="w-full bg-dark rounded p-2 text-xs" value={balanceAdj} onChange={e => setBalanceAdj(e.target.value)} />
-                                        <Button size="sm" onClick={() => handleAddMoney(u.uid)}>Apply</Button>
-                                    </div>
-                                )}
+                                <Button size="sm" onClick={() => setSelectedUser(u)}>View</Button>
                             </div>
                         ))}
                     </div>
                 )}
 
+                {/* --- Withdrawals View --- */}
                 {view === 'withdrawals' && (
                     <div className="space-y-3">
-                        {withdrawals.filter(w => w.status === 'pending').length === 0 && <p className="text-center text-gray-500 text-sm">No pending requests.</p>}
                         {withdrawals.filter(w => w.status === 'pending').map(w => (
                             <div key={w.id} className="bg-dark-light p-4 rounded-2xl border border-white/5">
                                 <div className="flex justify-between items-center mb-2">
@@ -189,8 +199,8 @@ export default function Admin() {
                                     <span className="text-success font-bold text-lg">${w.amount}</span>
                                 </div>
                                 <div className="text-xs text-gray-400 mb-4 bg-dark p-2 rounded">
-                                    <div>Method: <span className="text-white">{w.method}</span></div>
-                                    <div>Number: <span className="text-white font-mono">{w.accountNumber}</span></div>
+                                    <div>Method: {w.method}</div>
+                                    <div>Number: {w.accountNumber}</div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <Button onClick={() => handleWithdrawal(w, 'paid')} className="bg-success hover:bg-success/90">Mark Paid</Button>
@@ -201,6 +211,7 @@ export default function Admin() {
                     </div>
                 )}
 
+                 {/* --- Notify View --- */}
                 {view === 'notify' && (
                     <div className="bg-dark-light p-6 rounded-2xl border border-white/5">
                          <h2 className="text-lg font-bold mb-4">Broadcast</h2>
@@ -218,6 +229,119 @@ export default function Admin() {
                     </div>
                 )}
             </div>
+
+            {/* --- USER MODAL --- */}
+            <Modal isOpen={!!selectedUser} onClose={() => setSelectedUser(null)} title="User Management">
+                {selectedUser && (
+                    <div className="space-y-6">
+                        <div className="flex items-center gap-4">
+                             <img src={selectedUser.photoURL || ''} className="w-16 h-16 rounded-full" />
+                             <div>
+                                 <h3 className="font-bold text-lg">{selectedUser.displayName}</h3>
+                                 <p className="text-xs text-gray-400">{selectedUser.email}</p>
+                                 <div className="flex gap-2 mt-1">
+                                     <span className={`text-[10px] px-2 py-0.5 rounded ${selectedUser.isBanned ? 'bg-error text-white' : 'bg-success text-white'}`}>
+                                         {selectedUser.isBanned ? 'BANNED' : 'ACTIVE'}
+                                     </span>
+                                     {selectedUser.isBetaTester && <span className="text-[10px] px-2 py-0.5 rounded bg-secondary text-white">BETA</span>}
+                                 </div>
+                             </div>
+                        </div>
+
+                        <div className="bg-dark p-4 rounded-xl border border-white/5">
+                            <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Financials</h4>
+                            <div className="text-2xl font-bold mb-3">${selectedUser.balance?.toFixed(2)}</div>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="number" 
+                                    placeholder="+/- Amount" 
+                                    className="bg-dark-light rounded px-2 text-sm w-full"
+                                    value={balanceAdj}
+                                    onChange={e => setBalanceAdj(e.target.value)}
+                                />
+                                <Button size="sm" onClick={handleAddMoney}>Update</Button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                             <h4 className="text-xs font-bold text-gray-400 uppercase">Actions</h4>
+                             <div className="grid grid-cols-2 gap-2">
+                                 <Button variant="secondary" size="sm" onClick={() => handleUserAction(selectedUser.uid, 'beta')}>
+                                     {selectedUser.isBetaTester ? 'Revoke Beta' : 'Grant Beta'}
+                                 </Button>
+                                 <Button variant="secondary" size="sm" onClick={() => handleUserAction(selectedUser.uid, 'freeze')}>
+                                     {selectedUser.monetizationFrozen ? 'Unfreeze Mon.' : 'Freeze Mon.'}
+                                 </Button>
+                                 <Button variant="danger" size="sm" className="col-span-2" onClick={() => handleUserAction(selectedUser.uid, 'ban')}>
+                                     {selectedUser.isBanned ? 'Unban User' : 'Ban User'}
+                                 </Button>
+                             </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* --- GROUP MODAL --- */}
+            <Modal isOpen={!!selectedGroup} onClose={() => setSelectedGroup(null)} title="Group Management">
+                {selectedGroup && (
+                    <div>
+                        <div className="flex gap-2 mb-4 border-b border-white/10 pb-2">
+                            <button onClick={() => setGroupTab('details')} className={`px-4 py-1 text-sm font-bold ${groupTab === 'details' ? 'text-primary' : 'text-gray-400'}`}>Details</button>
+                            <button onClick={() => setGroupTab('actions')} className={`px-4 py-1 text-sm font-bold ${groupTab === 'actions' ? 'text-primary' : 'text-gray-400'}`}>Actions</button>
+                        </div>
+
+                        {groupTab === 'details' ? (
+                             <div className="space-y-4">
+                                 <img src={selectedGroup.iconUrl} className="w-full h-32 object-cover rounded-xl bg-gray-800" />
+                                 <div>
+                                     <h3 className="font-bold text-lg">{selectedGroup.name}</h3>
+                                     <p className="text-sm text-gray-400">{selectedGroup.description}</p>
+                                 </div>
+                                 <div className="grid grid-cols-2 gap-2 text-sm">
+                                     <div className="bg-dark p-2 rounded">Members: {selectedGroup.memberCount}</div>
+                                     <div className="bg-dark p-2 rounded">Category: {selectedGroup.category}</div>
+                                     <div className="bg-dark p-2 rounded">Views: {selectedGroup.views}</div>
+                                     <div className="bg-dark p-2 rounded">Clicks: {selectedGroup.clicks}</div>
+                                 </div>
+                             </div>
+                        ) : (
+                             <div className="space-y-4">
+                                  <div className="bg-dark p-4 rounded-xl border border-white/5">
+                                      <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Adjust Stats</h4>
+                                      <div className="grid grid-cols-2 gap-2">
+                                          <div>
+                                              <label className="text-[10px] text-gray-500">Views</label>
+                                              <input className="w-full bg-dark-light rounded p-2 text-sm" type="number" value={editViews} onChange={e => setEditViews(e.target.value)} />
+                                          </div>
+                                          <div>
+                                              <label className="text-[10px] text-gray-500">Clicks</label>
+                                              <input className="w-full bg-dark-light rounded p-2 text-sm" type="number" value={editClicks} onChange={e => setEditClicks(e.target.value)} />
+                                          </div>
+                                      </div>
+                                      <Button size="sm" className="mt-2 w-full" onClick={handleUpdateGroupStats}>Update Stats</Button>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                      {selectedGroup.status === 'pending' && (
+                                          <div className="flex gap-2">
+                                              <Button fullWidth onClick={() => handleGroupStatus(selectedGroup, 'approved')} className="bg-success text-white">Approve</Button>
+                                              <Button fullWidth onClick={() => handleGroupStatus(selectedGroup, 'rejected')} className="bg-error text-white">Reject</Button>
+                                          </div>
+                                      )}
+                                      
+                                      <Button fullWidth variant="secondary" onClick={handleToggleViolation} className="border border-warning text-warning bg-warning/10">
+                                          {selectedGroup.isGuidelineViolation ? 'Remove Violation Mark' : 'Mark Guideline Violation'}
+                                      </Button>
+                                      
+                                      <Button fullWidth variant="danger" onClick={handleDeleteGroup}>
+                                          <Trash2 size={16} className="mr-2" /> Permanently Delete
+                                      </Button>
+                                  </div>
+                             </div>
+                        )}
+                    </div>
+                )}
+            </Modal>
         </div>
     )
 }

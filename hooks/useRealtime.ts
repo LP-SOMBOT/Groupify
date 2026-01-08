@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 export function useRealtimeGroups(category?: string, userId?: string, onlyApproved: boolean = true) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
+  const { profile } = useAuth(); // Needed to check if user is beta tester or admin? No, admin hook is separate.
 
   useEffect(() => {
     const groupsRef = ref(db, 'groups');
@@ -20,14 +21,22 @@ export function useRealtimeGroups(category?: string, userId?: string, onlyApprov
           ...data[key]
         })).reverse();
 
+        // 1. Violation Filter: Only owner can see violated groups
+        groupList = groupList.filter(g => {
+            if (!g.isGuidelineViolation) return true;
+            return userId && g.createdBy === userId; // Only show if user owns it
+        });
+
+        // 2. Status Filter
         if (onlyApproved) {
-            // If viewing own groups (userId provided), show all statuses. 
-            // If exploring (no userId), show only approved.
             if (!userId) {
+                // Public/Explore view: Only approved
                 groupList = groupList.filter(g => g.status === 'approved');
             }
+            // If userId is provided (My Groups), show all statuses (pending/rejected/approved)
         }
 
+        // 3. Category/Creator Filter
         if (userId) {
           groupList = groupList.filter(g => g.createdBy === userId);
         } else if (category && category !== 'All') {
@@ -59,6 +68,7 @@ export function useAdminRealtimeGroups() {
     const unsubscribe = onValue(groupsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
+        // Admin sees EVERYTHING
         const groupList = Object.keys(data).map(key => ({
           id: key,
           ...data[key]
@@ -93,7 +103,7 @@ export function useRealtimeNotifications() {
     const updateState = () => {
       const combined = [...broadcasts, ...userNotifs].sort((a, b) => b.timestamp - a.timestamp);
       setNotifications(combined);
-      setUnreadCount(userNotifs.filter(n => !n.read).length); // Broadcasts don't track read state in this simple version
+      setUnreadCount(userNotifs.filter(n => !n.read).length); 
       setLoading(false);
     };
 
@@ -101,7 +111,7 @@ export function useRealtimeNotifications() {
         broadcasts = [];
         if (snap.exists()) {
              const val = snap.val();
-             Object.keys(val).forEach(k => broadcasts.push({id: k, ...val[k], read: true})); // Treat broadcasts as read for badge count simplicity or use localstorage to track
+             Object.keys(val).forEach(k => broadcasts.push({id: k, ...val[k], read: true})); 
         }
         updateState();
     });

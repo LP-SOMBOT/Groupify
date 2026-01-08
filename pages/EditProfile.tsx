@@ -4,10 +4,13 @@ import Button from '../components/ui/Button';
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { updateUserProfile } from '../lib/db';
+import { updateProfile } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 export default function EditProfile() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const [name, setName] = useState(profile?.displayName || user?.displayName || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [loading, setLoading] = useState(false);
 
@@ -15,7 +18,14 @@ export default function EditProfile() {
     e.preventDefault();
     if (!user) return;
     setLoading(true);
-    await updateUserProfile(user.uid, { bio });
+    
+    // Update Firebase Auth
+    if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: name });
+    }
+
+    // Update Realtime DB
+    await updateUserProfile(user.uid, { bio, displayName: name });
     setLoading(false);
     navigate(-1);
   };
@@ -30,6 +40,16 @@ export default function EditProfile() {
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+             <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase">Display Name</label>
+                <input 
+                    className="w-full bg-dark-light border border-white/10 rounded-xl p-3 focus:border-primary focus:outline-none"
+                    placeholder="Your Name"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                />
+             </div>
+             
              <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Bio</label>
                 <textarea 

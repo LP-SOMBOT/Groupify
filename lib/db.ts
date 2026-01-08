@@ -29,6 +29,7 @@ export const createUserProfile = async (uid: string, email: string, name: string
       balance: 0,
       isBanned: false,
       isCreator: false,
+      isBetaTester: false,
       monetizationFrozen: false
     });
   }
@@ -57,6 +58,7 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     createdBy: userId,
     createdAt: Date.now(),
     isVerified: false,
+    isGuidelineViolation: false,
     status: 'pending', // Pending by default
     views: 0,
     clicks: 0
@@ -70,7 +72,6 @@ export const updateGroupStatus = async (groupId: string, status: 'approved' | 'r
   const groupRef = ref(db, `groups/${groupId}`);
   await update(groupRef, { status });
 
-  // Notify owner
   if (status !== 'pending') {
     await createSystemNotification(
       ownerId,
@@ -90,22 +91,48 @@ export const deleteGroup = async (groupId: string) => {
   await remove(groupRef);
 };
 
+// --- Unique Tracking Logic ---
+
+const getTrackingId = (currentUserId?: string) => {
+  if (currentUserId) return currentUserId;
+  let anonId = localStorage.getItem('anon_device_id');
+  if (!anonId) {
+    anonId = 'anon_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('anon_device_id', anonId);
+  }
+  return anonId;
+};
+
 export const trackGroupClick = async (groupId: string, ownerId: string, currentUserId?: string) => {
   // Don't count owner clicks
   if (currentUserId && currentUserId === ownerId) return;
 
-  const updates: any = {};
-  updates[`groups/${groupId}/clicks`] = increment(1);
-  await update(ref(db), updates);
+  const trackerId = getTrackingId(currentUserId);
+  const trackRef = ref(db, `tracking/clicks/${groupId}/${trackerId}`);
+  
+  const snapshot = await get(trackRef);
+  if (!snapshot.exists()) {
+    await set(trackRef, true); // Mark as clicked
+    const updates: any = {};
+    updates[`groups/${groupId}/clicks`] = increment(1);
+    await update(ref(db), updates);
+  }
 };
 
 export const trackGroupView = async (groupId: string, ownerId: string, currentUserId?: string) => {
   // Don't count owner views
   if (currentUserId && currentUserId === ownerId) return;
 
-  const updates: any = {};
-  updates[`groups/${groupId}/views`] = increment(1);
-  await update(ref(db), updates);
+  const trackerId = getTrackingId(currentUserId);
+  const trackRef = ref(db, `tracking/views/${groupId}/${trackerId}`);
+  
+  const snapshot = await get(trackRef);
+  if (!snapshot.exists()) {
+    await set(trackRef, true); // Mark as viewed
+    const updates: any = {};
+    updates[`groups/${groupId}/views`] = increment(1);
+    await update(ref(db), updates);
+  }
 };
 
 // --- Notifications ---
@@ -137,10 +164,21 @@ export const markNotificationRead = async (userId: string, notifId: string) => {
   await update(ref(db, `notifications/users/${userId}/${notifId}`), { read: true });
 };
 
+export const markAllNotificationsRead = async (userId: string, notifications: any[]) => {
+  const updates: any = {};
+  notifications.forEach(n => {
+    if (!n.isBroadcast && !n.read) {
+       updates[`notifications/users/${userId}/${n.id}/read`] = true;
+    }
+  });
+  if (Object.keys(updates).length > 0) {
+    await update(ref(db), updates);
+  }
+};
+
 // --- Withdrawals ---
 
 export const requestWithdrawal = async (userId: string, userName: string, amount: number, method: PaymentMethod, accountNumber: string) => {
-  // Deduct balance first (optimistic)
   await update(ref(db, `users/${userId}`), { balance: increment(-amount) });
   
   const withdrawRef = push(ref(db, 'withdrawals'));
@@ -159,7 +197,6 @@ export const processWithdrawal = async (withdrawalId: string, status: 'paid' | '
   await update(ref(db, `withdrawals/${withdrawalId}`), { status });
   
   if (status === 'rejected') {
-    // Refund logic
     await update(ref(db, `users/${userId}`), { balance: increment(amount) });
     await createSystemNotification(userId, "Withdrawal Rejected", "Your withdrawal request was rejected and funds returned.", "alert");
   } else {

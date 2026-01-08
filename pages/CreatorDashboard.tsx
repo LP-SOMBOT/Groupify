@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRealtimeGroups } from '../hooks/useRealtime';
 import Button from '../components/ui/Button';
-import { ChevronLeft, Lock, Trophy, TrendingUp, Wallet, ArrowRight } from 'lucide-react';
+import { ChevronLeft, Lock, Trophy, TrendingUp, Wallet, ArrowRight, FlaskConical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { formatCompactNumber } from '../lib/utils';
 import { updateUserProfile } from '../lib/db';
@@ -23,7 +23,8 @@ export default function CreatorDashboard() {
   const estimatedEarnings = (totalViews * RATE_PER_VIEW) + (totalClicks * RATE_PER_CLICK);
 
   const ELIGIBILITY_THRESHOLD = 1000;
-  const isEligible = totalViews >= ELIGIBILITY_THRESHOLD;
+  // Beta testers bypass threshold
+  const isEligible = totalViews >= ELIGIBILITY_THRESHOLD || profile?.isBetaTester;
 
   const handleJoinProgram = async () => {
     if (!profile) return;
@@ -43,6 +44,16 @@ export default function CreatorDashboard() {
             </button>
             <h1 className="text-xl font-bold">Creator Dashboard</h1>
         </div>
+
+        {profile?.isBetaTester && (
+             <div className="bg-secondary/10 border border-secondary/20 p-4 rounded-xl mb-4 flex gap-3 items-center">
+                 <FlaskConical className="text-secondary" />
+                 <div>
+                     <h3 className="font-bold text-secondary text-sm">Beta Tester Access</h3>
+                     <p className="text-xs text-gray-400">You have early access to monetization features.</p>
+                 </div>
+             </div>
+        )}
 
         {/* Balance Card */}
         <div className="bg-gradient-to-r from-success/20 to-primary/20 border border-success/30 rounded-2xl p-6 mb-6 text-center relative overflow-hidden">

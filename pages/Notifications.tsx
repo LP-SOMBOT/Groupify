@@ -1,11 +1,21 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useRealtimeNotifications } from '../hooks/useRealtime';
+import { markAllNotificationsRead } from '../lib/db';
+import { useAuth } from '../context/AuthContext';
 import { Bell, Info, AlertTriangle, Zap, ArrowLeft, Radio } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Notifications() {
+  const { user } = useAuth();
   const { notifications, loading } = useRealtimeNotifications();
   const navigate = useNavigate();
+
+  // Mark all as read when entering page
+  useEffect(() => {
+    if (user && notifications.length > 0) {
+      markAllNotificationsRead(user.uid, notifications);
+    }
+  }, [user, notifications.length]); // Dependencies ensure it runs when notifications load
 
   const getIcon = (type: string) => {
     switch (type) {

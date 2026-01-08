@@ -8,8 +8,9 @@ export interface UserProfile {
   balance: number;
   isBanned: boolean;
   isCreator: boolean; // Approved for monetization
+  isBetaTester: boolean; // New Beta Tester flag
   monetizationFrozen: boolean;
-  paymentPin?: string; // Encrypted ideally, but plain for this demo scope
+  paymentPin?: string;
 }
 
 export type GroupStatus = 'pending' | 'approved' | 'rejected';
@@ -22,6 +23,7 @@ export interface Group {
   inviteLink: string;
   iconUrl?: string; // Base64 or URL
   isVerified: boolean;
+  isGuidelineViolation: boolean; // New Violation flag
   status: GroupStatus;
   memberCount: number;
   tags: string[];

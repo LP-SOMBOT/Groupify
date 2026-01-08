@@ -7,6 +7,7 @@ import MyGroups from './pages/MyGroups';
 import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import AddGroup from './pages/AddGroup';
+import EditGroup from './pages/EditGroup';
 import Admin from './pages/Admin';
 import Notifications from './pages/Notifications';
 import CreatorDashboard from './pages/CreatorDashboard';
@@ -48,6 +49,7 @@ export default function App() {
             {/* Protected Routes */}
             <Route path="/my-groups" element={<ProtectedRoute><MyGroups /></ProtectedRoute>} />
             <Route path="/add-group" element={<ProtectedRoute><AddGroup /></ProtectedRoute>} />
+            <Route path="/edit-group/:id" element={<ProtectedRoute><EditGroup /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
             <Route path="/cashout" element={<ProtectedRoute><Cashout /></ProtectedRoute>} />
