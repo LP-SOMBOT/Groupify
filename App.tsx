@@ -7,6 +7,7 @@ import MyGroups from './pages/MyGroups';
 import Profile from './pages/Profile';
 import Auth from './pages/Auth';
 import AddGroup from './pages/AddGroup';
+import Admin from './pages/Admin';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
 // Updates to handle redirect back to original location
@@ -32,6 +33,7 @@ export default function App() {
       <HashRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/adminlp" element={<Admin />} />
           
           <Route element={<Layout />}>
             {/* Public Routes */}

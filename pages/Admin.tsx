@@ -1,0 +1,203 @@
+import React, { useState, useEffect } from 'react';
+import { getAllGroupsForAdmin, updateGroupVerification, deleteGroup } from '../lib/firestore';
+import { Group } from '../lib/types';
+import Button from '../components/ui/Button';
+import { Shield, Trash2, CheckCircle, XCircle, RefreshCw, LogOut, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+export default function Admin() {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [pin, setPin] = useState('');
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [filter, setFilter] = useState('');
+    const navigate = useNavigate();
+
+    const handleLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (pin === '1234') {
+            setIsAuthenticated(true);
+            fetchData();
+        } else {
+            alert('Invalid PIN');
+            setPin('');
+        }
+    }
+
+    const fetchData = async () => {
+        setLoading(true);
+        const data = await getAllGroupsForAdmin();
+        setGroups(data);
+        setLoading(false);
+    }
+
+    const handleToggleVerify = async (group: Group) => {
+        // eslint-disable-next-line no-restricted-globals
+        if (!confirm(`Change verification status for "${group.name}"?`)) return;
+        
+        // Optimistic update
+        setGroups(prev => prev.map(g => g.id === group.id ? { ...g, isVerified: !g.isVerified } : g));
+        
+        try {
+            await updateGroupVerification(group.id, !group.isVerified);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to update status");
+            fetchData(); // Revert on error
+        }
+    }
+
+    const handleDelete = async (id: string) => {
+        // eslint-disable-next-line no-restricted-globals
+        if (!confirm('Are you sure you want to PERMANENTLY delete this group?')) return;
+        
+        // Optimistic update
+        setGroups(prev => prev.filter(g => g.id !== id));
+
+        try {
+            await deleteGroup(id);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to delete group");
+            fetchData(); // Revert on error
+        }
+    }
+
+    const filteredGroups = groups.filter(g => 
+        g.name.toLowerCase().includes(filter.toLowerCase()) || 
+        g.id.includes(filter)
+    );
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-dark flex flex-col items-center justify-center p-4">
+                <div className="w-full max-w-xs bg-dark-light p-8 rounded-2xl border border-white/5 shadow-2xl">
+                    <div className="flex justify-center mb-6 text-error animate-pulse">
+                        <Shield size={48} />
+                    </div>
+                    <h1 className="text-xl font-bold text-center mb-2">Restricted Area</h1>
+                    <p className="text-gray-500 text-center text-xs mb-6">Super Admin Access Only</p>
+                    
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <input
+                            type="password"
+                            value={pin}
+                            onChange={e => setPin(e.target.value)}
+                            placeholder="Enter PIN"
+                            className="w-full bg-dark border border-white/10 rounded-xl px-4 py-3 text-center tracking-widest text-lg focus:border-error outline-none transition-colors text-white"
+                            autoFocus
+                        />
+                        <Button fullWidth variant="danger" type="submit" className="h-12 shadow-none">
+                            Access Control
+                        </Button>
+                    </form>
+                    <button onClick={() => navigate('/')} className="w-full mt-6 text-xs text-gray-500 hover:text-white transition-colors">
+                        ← Back to App
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    return (
+        <div className="min-h-screen bg-dark pb-20 font-sans text-gray-100">
+            {/* Header */}
+            <div className="bg-dark-light border-b border-white/5 p-4 sticky top-0 z-20 flex justify-between items-center shadow-md">
+                <h1 className="font-bold text-lg flex items-center gap-2 text-error">
+                    <Shield size={20} fill="currentColor" className="text-error/20" />
+                    <span className="tracking-tight">Super Admin</span>
+                </h1>
+                <div className="flex gap-2">
+                     <button onClick={fetchData} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400 hover:text-white" title="Refresh">
+                        <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                     </button>
+                     <button onClick={() => setIsAuthenticated(false)} className="p-2 hover:bg-white/10 rounded-lg text-error transition-colors" title="Logout">
+                        <LogOut size={20} />
+                     </button>
+                </div>
+            </div>
+
+            <div className="p-4 space-y-6 max-w-2xl mx-auto">
+                {/* Stats */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-dark-light p-4 rounded-2xl border border-white/5 text-center shadow-lg">
+                        <div className="text-2xl font-bold mb-1">{groups.length}</div>
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total</div>
+                    </div>
+                    <div className="bg-dark-light p-4 rounded-2xl border border-white/5 text-center shadow-lg">
+                        <div className="text-2xl font-bold text-verified mb-1">{groups.filter(g => g.isVerified).length}</div>
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Verified</div>
+                    </div>
+                    <div className="bg-dark-light p-4 rounded-2xl border border-white/5 text-center shadow-lg">
+                         <div className="text-2xl font-bold text-warning mb-1">{groups.filter(g => !g.isVerified).length}</div>
+                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Pending</div>
+                    </div>
+                </div>
+
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                    <input 
+                        type="text" 
+                        placeholder="Search groups..." 
+                        className="w-full bg-dark-light border border-white/5 rounded-xl py-2.5 pl-9 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
+                        value={filter}
+                        onChange={e => setFilter(e.target.value)}
+                    />
+                </div>
+
+                {/* List */}
+                <div className="space-y-3">
+                    {loading && groups.length === 0 ? (
+                        <div className="text-center p-8 text-gray-500">Loading data...</div>
+                    ) : filteredGroups.map(group => (
+                        <div key={group.id} className="bg-dark-light p-3 rounded-2xl border border-white/5 flex items-center gap-3 hover:border-white/10 transition-colors">
+                            <img 
+                                src={group.iconUrl} 
+                                className="w-12 h-12 rounded-xl bg-gray-800 object-cover border border-white/5" 
+                                alt=""
+                            />
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                    <h3 className="font-bold text-sm text-white truncate">{group.name}</h3>
+                                    {group.isVerified && <CheckCircle size={14} className="text-verified fill-verified/10" />}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                                    <span className="truncate max-w-[100px]">ID: {group.id}</span>
+                                    <span>•</span>
+                                    <span>{new Date(group.createdAt).toLocaleDateString()}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleToggleVerify(group)}
+                                    title={group.isVerified ? "Revoke Verification" : "Verify Group"}
+                                    className={`p-2 rounded-xl transition-all ${
+                                        group.isVerified 
+                                        ? 'text-verified bg-verified/10 hover:bg-verified/20' 
+                                        : 'text-gray-600 bg-white/5 hover:bg-white/10 hover:text-gray-300'
+                                    }`}
+                                >
+                                    {group.isVerified ? <CheckCircle size={20} /> : <CheckCircle size={20} className="opacity-50" />}
+                                </button>
+                                <button
+                                    onClick={() => handleDelete(group.id)}
+                                    title="Delete Group"
+                                    className="p-2 rounded-xl text-error bg-error/10 hover:bg-error/20 transition-all"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {filteredGroups.length === 0 && !loading && (
+                         <div className="text-center p-8 text-gray-600 text-sm">
+                            No groups found.
+                         </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    )
+}

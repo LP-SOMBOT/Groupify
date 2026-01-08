@@ -7,7 +7,10 @@ import {
   orderBy, 
   limit,
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  doc,
+  updateDoc,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Group, CreateGroupData } from './types';
@@ -78,4 +81,32 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     iconUrl: `https://ui-avatars.com/api/?name=${data.name}&background=random&color=fff&size=200`
   });
   return docRef.id;
+};
+
+// --- Admin Functions ---
+
+export const getAllGroupsForAdmin = async (): Promise<Group[]> => {
+  try {
+    // Fetch all groups without limit, ordered by newest
+    const q = query(collection(db, GROUPS_COLLECTION), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ 
+      id: doc.id, 
+      ...doc.data(), 
+      createdAt: doc.data().createdAt?.toMillis() || Date.now() 
+    } as Group));
+  } catch (error) {
+    console.error("Admin fetch error:", error);
+    return [];
+  }
+};
+
+export const updateGroupVerification = async (groupId: string, status: boolean) => {
+  const groupRef = doc(db, GROUPS_COLLECTION, groupId);
+  await updateDoc(groupRef, { isVerified: status });
+};
+
+export const deleteGroup = async (groupId: string) => {
+  const groupRef = doc(db, GROUPS_COLLECTION, groupId);
+  await deleteDoc(groupRef);
 };
