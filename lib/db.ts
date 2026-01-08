@@ -7,12 +7,11 @@ import {
   remove, 
   query, 
   orderByChild, 
-  equalTo,
-  increment,
-  serverTimestamp
+  increment
 } from 'firebase/database';
 import { db } from './firebase';
-import { Group, CreateGroupData, WithdrawalRequest, PaymentMethod, UserProfile } from './types';
+import { Group, CreateGroupData, PaymentMethod, UserProfile, PaymentMethodConfig } from './types';
+import { getDeviceId } from './utils';
 
 // --- Users ---
 
@@ -59,7 +58,7 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     createdAt: Date.now(),
     isVerified: false,
     isGuidelineViolation: false,
-    status: 'pending', // Pending by default
+    status: 'pending',
     views: 0,
     clicks: 0
   };
@@ -93,21 +92,11 @@ export const deleteGroup = async (groupId: string) => {
 
 // --- Unique Tracking Logic ---
 
-const getTrackingId = (currentUserId?: string) => {
-  if (currentUserId) return currentUserId;
-  let anonId = localStorage.getItem('anon_device_id');
-  if (!anonId) {
-    anonId = 'anon_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('anon_device_id', anonId);
-  }
-  return anonId;
-};
-
 export const trackGroupClick = async (groupId: string, ownerId: string, currentUserId?: string) => {
   // Don't count owner clicks
   if (currentUserId && currentUserId === ownerId) return;
 
-  const trackerId = getTrackingId(currentUserId);
+  const trackerId = currentUserId || getDeviceId();
   const trackRef = ref(db, `tracking/clicks/${groupId}/${trackerId}`);
   
   const snapshot = await get(trackRef);
@@ -123,7 +112,7 @@ export const trackGroupView = async (groupId: string, ownerId: string, currentUs
   // Don't count owner views
   if (currentUserId && currentUserId === ownerId) return;
 
-  const trackerId = getTrackingId(currentUserId);
+  const trackerId = currentUserId || getDeviceId();
   const trackRef = ref(db, `tracking/views/${groupId}/${trackerId}`);
   
   const snapshot = await get(trackRef);
@@ -160,20 +149,9 @@ export const createSystemNotification = async (userId: string, title: string, me
   });
 };
 
-export const markNotificationRead = async (userId: string, notifId: string) => {
-  await update(ref(db, `notifications/users/${userId}/${notifId}`), { read: true });
-};
-
-export const markAllNotificationsRead = async (userId: string, notifications: any[]) => {
-  const updates: any = {};
-  notifications.forEach(n => {
-    if (!n.isBroadcast && !n.read) {
-       updates[`notifications/users/${userId}/${n.id}/read`] = true;
-    }
-  });
-  if (Object.keys(updates).length > 0) {
-    await update(ref(db), updates);
-  }
+// Permanently delete personal notification
+export const deleteNotification = async (userId: string, notifId: string) => {
+  await remove(ref(db, `notifications/users/${userId}/${notifId}`));
 };
 
 // --- Withdrawals ---
@@ -202,4 +180,29 @@ export const processWithdrawal = async (withdrawalId: string, status: 'paid' | '
   } else {
     await createSystemNotification(userId, "Payment Sent", "Your withdrawal has been processed successfully.", "update");
   }
+};
+
+// --- Payment Methods (Admin) ---
+
+export const addPaymentMethod = async (name: string, provider: string, instruction: string) => {
+  const refPath = push(ref(db, 'settings/paymentMethods'));
+  await set(refPath, {
+    name,
+    provider,
+    instruction,
+    isEnabled: true
+  });
+};
+
+export const removePaymentMethod = async (id: string) => {
+  await remove(ref(db, `settings/paymentMethods/${id}`));
+};
+
+export const getPaymentMethods = async (): Promise<PaymentMethodConfig[]> => {
+  const snapshot = await get(ref(db, 'settings/paymentMethods'));
+  if (snapshot.exists()) {
+    const val = snapshot.val();
+    return Object.keys(val).map(key => ({ id: key, ...val[key] }));
+  }
+  return [];
 };

@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import { LogOut, Settings, Shield, User, ChevronRight, BarChart3, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getNameInitials } from '../lib/utils';
 
 export default function Profile() {
   const { user, profile, logout } = useAuth();
@@ -17,17 +18,25 @@ export default function Profile() {
       )
   }
 
+  const name = profile?.displayName || user.displayName || 'User';
+
   return (
     <div className="space-y-6 pt-4">
       <div className="flex flex-col items-center">
-        <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary mb-4">
-          <img 
-            src={profile?.photoURL || user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}&background=1A1A2E&color=fff`} 
-            alt="Profile" 
-            className="w-full h-full rounded-full object-cover border-4 border-dark"
-          />
+        <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-primary to-secondary mb-4 flex items-center justify-center">
+            {profile?.photoURL ? (
+                <img 
+                    src={profile.photoURL} 
+                    alt="Profile" 
+                    className="w-full h-full rounded-full object-cover border-4 border-dark"
+                />
+            ) : (
+                <div className="w-full h-full rounded-full bg-dark-light border-4 border-dark flex items-center justify-center text-4xl font-bold text-white">
+                    {getNameInitials(name)}
+                </div>
+            )}
         </div>
-        <h2 className="text-xl font-bold text-white">{profile?.displayName || user.displayName || 'User'}</h2>
+        <h2 className="text-xl font-bold text-white">{name}</h2>
         <p className="text-sm text-gray-400 text-center max-w-xs mt-1">
             {profile?.bio || "No bio yet."}
         </p>
@@ -89,7 +98,7 @@ export default function Profile() {
         Sign Out
       </Button>
       
-      <p className="text-center text-xs text-gray-600 pb-8">Groupify v2.1</p>
+      <p className="text-center text-xs text-gray-600 pb-8">Groupify v2.5</p>
     </div>
   );
 }

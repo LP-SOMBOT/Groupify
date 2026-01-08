@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Group } from '../../lib/types';
 import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye, Clock, Edit, Trash, AlertOctagon } from 'lucide-react';
-import { formatCompactNumber } from '../../lib/utils';
+import { formatCompactNumber, getNameInitials } from '../../lib/utils';
 import Button from '../ui/Button';
 import { trackGroupClick, trackGroupView, deleteGroup } from '../../lib/db';
 import { useAuth } from '../../context/AuthContext';
@@ -41,18 +41,21 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
 
   return (
     <div className={`bg-dark-light rounded-2xl p-4 border transition-all active:scale-[0.99] flex gap-4 relative overflow-hidden ${group.isGuidelineViolation ? 'border-error/50 bg-error/5' : 'border-white/5 hover:border-primary/30'}`}>
-      <div className="relative shrink-0">
+      <div className="relative shrink-0 flex flex-col items-center gap-2">
         <img 
           src={group.iconUrl || 'https://picsum.photos/100'} 
           alt={group.name} 
-          className="w-20 h-20 rounded-xl object-cover bg-gray-800"
+          className="w-16 h-16 rounded-xl object-cover bg-gray-800"
           onError={(e) => {
             (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${group.name}&background=2A2A3E&color=fff`;
           }}
         />
-        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-dark-light px-2 py-0.5 rounded-full border border-white/10 text-[10px] font-bold text-gray-300 flex items-center gap-1 shadow-sm whitespace-nowrap">
-          <Users size={10} />
-          {formatCompactNumber(group.memberCount)}
+        {/* Creator Profile */}
+        <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-full max-w-[80px]">
+            <div className="w-4 h-4 rounded-full bg-primary flex items-center justify-center text-[8px] font-bold text-white shrink-0">
+               {getNameInitials(group.creatorName || 'User')}
+            </div>
+            <span className="text-[9px] text-gray-400 truncate w-full">{group.creatorName?.split(' ')[0] || 'User'}</span>
         </div>
       </div>
       
@@ -70,9 +73,15 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
           <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed mb-2">
             {group.description}
           </p>
+          
+          <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-2">
+             <span className="flex items-center gap-1"><Users size={10} /> {formatCompactNumber(group.memberCount)}</span>
+             <span>•</span>
+             <span>{group.category}</span>
+          </div>
         </div>
         
-        <div className="flex justify-end mt-2 items-center gap-3">
+        <div className="flex justify-end mt-auto items-center gap-3">
            {showStats && (
              <div className="flex items-center gap-3 mr-auto">
                 <div className="flex items-center gap-1 text-[10px] text-gray-500">
@@ -94,7 +103,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
                     size="sm" 
                     className="h-7 text-xs px-3 rounded-lg gap-1" 
                     onClick={handleJoin}
-                    disabled={group.isGuidelineViolation} // Disable join if violation
+                    disabled={group.isGuidelineViolation} 
                 >
                     Join <ExternalLink size={10} />
                 </Button>

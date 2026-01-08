@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useRealtimeNotifications } from '../hooks/useRealtime';
-import { markAllNotificationsRead } from '../lib/db';
+import { deleteNotification } from '../lib/db';
 import { useAuth } from '../context/AuthContext';
 import { Bell, Info, AlertTriangle, Zap, ArrowLeft, Radio } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -10,12 +10,16 @@ export default function Notifications() {
   const { notifications, loading } = useRealtimeNotifications();
   const navigate = useNavigate();
 
-  // Mark all as read when entering page
+  // Clear Personal Notifications from DB on View
   useEffect(() => {
     if (user && notifications.length > 0) {
-      markAllNotificationsRead(user.uid, notifications);
+      notifications.forEach(n => {
+        if (!n.isBroadcast) {
+          deleteNotification(user.uid, n.id);
+        }
+      });
     }
-  }, [user, notifications.length]); // Dependencies ensure it runs when notifications load
+  }, [user, notifications]);
 
   const getIcon = (type: string) => {
     switch (type) {

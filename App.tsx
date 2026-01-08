@@ -15,6 +15,7 @@ import Cashout from './pages/Cashout';
 import Settings from './pages/Settings';
 import EditProfile from './pages/EditProfile';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ToastProvider } from './context/ToastContext';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
@@ -35,32 +36,34 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 export default function App() {
   return (
     <AuthProvider>
-      <HashRouter>
-        <Routes>
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/adminlp" element={<Admin />} />
-          
-          <Route element={<Layout />}>
-            {/* Public Routes */}
-            <Route path="/" element={<Home />} />
-            <Route path="/explore" element={<Explore />} />
-            <Route path="/notifications" element={<Notifications />} />
+      <ToastProvider>
+        <HashRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/adminlp" element={<Admin />} />
             
-            {/* Protected Routes */}
-            <Route path="/my-groups" element={<ProtectedRoute><MyGroups /></ProtectedRoute>} />
-            <Route path="/add-group" element={<ProtectedRoute><AddGroup /></ProtectedRoute>} />
-            <Route path="/edit-group/:id" element={<ProtectedRoute><EditGroup /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
-            <Route path="/cashout" element={<ProtectedRoute><Cashout /></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-            <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
-            
-            {/* Catch all redirect */}
-            <Route path="*" element={<Navigate to="/" />} />
-          </Route>
-        </Routes>
-      </HashRouter>
+            <Route element={<Layout />}>
+              {/* Public Routes */}
+              <Route path="/" element={<Home />} />
+              <Route path="/explore" element={<Explore />} />
+              <Route path="/notifications" element={<Notifications />} />
+              
+              {/* Protected Routes */}
+              <Route path="/my-groups" element={<ProtectedRoute><MyGroups /></ProtectedRoute>} />
+              <Route path="/add-group" element={<ProtectedRoute><AddGroup /></ProtectedRoute>} />
+              <Route path="/edit-group/:id" element={<ProtectedRoute><EditGroup /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><CreatorDashboard /></ProtectedRoute>} />
+              <Route path="/cashout" element={<ProtectedRoute><Cashout /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/edit-profile" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
+              
+              {/* Catch all redirect */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Route>
+          </Routes>
+        </HashRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

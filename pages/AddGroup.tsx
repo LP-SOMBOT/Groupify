@@ -4,11 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { createGroup } from '../lib/db';
 import { CATEGORIES, Category } from '../lib/types';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 import { ChevronLeft, Hash, Link as LinkIcon, Layers, Info, ImagePlus, Users } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 export default function AddGroup() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
@@ -27,8 +30,8 @@ export default function AddGroup() {
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-          alert("Image size should be less than 2MB");
+      if (file.size > 2 * 1024 * 1024) { 
+          showToast("Image size should be less than 2MB", 'error');
           return;
       }
       const reader = new FileReader();
@@ -46,7 +49,7 @@ export default function AddGroup() {
     setLoading(true);
     try {
       if (!formData.inviteLink.includes('chat.whatsapp.com')) {
-        alert('Please provide a valid WhatsApp invite link');
+        showToast('Please provide a valid WhatsApp invite link', 'error');
         setLoading(false);
         return;
       }
@@ -58,14 +61,16 @@ export default function AddGroup() {
         category: formData.category,
         tags: formData.tags.split(',').map(t => t.trim()).filter(Boolean),
         iconUrl: formData.iconUrl,
-        memberCount: parseInt(formData.memberCount) || 1
+        memberCount: parseInt(formData.memberCount) || 1,
+        creatorName: profile?.displayName || user.displayName || 'Unknown',
+        creatorPhoto: profile?.photoURL || user.photoURL || undefined
       }, user.uid);
       
-      alert("Group submitted! It will be visible after Admin approval.");
+      showToast("Group submitted for approval!", 'success');
       navigate('/my-groups');
     } catch (error) {
       console.error(error);
-      alert('Failed to create group');
+      showToast('Failed to create group', 'error');
     } finally {
       setLoading(false);
     }
@@ -98,23 +103,17 @@ export default function AddGroup() {
         </div>
 
         {/* Basic Info */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Group Name</label>
-          <div className="relative">
-             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"><Layers size={18} /></div>
-             <input
-              required
-              type="text"
-              placeholder="e.g. React Developers"
-              className="w-full bg-dark-light border border-white/10 rounded-xl h-12 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
-              value={formData.name}
-              onChange={e => setFormData({...formData, name: e.target.value})}
-            />
-          </div>
-        </div>
+        <Input 
+          label="Group Name" 
+          required 
+          icon={<Layers size={18} />}
+          placeholder="e.g. React Developers"
+          value={formData.name}
+          onChange={e => setFormData({...formData, name: e.target.value})}
+        />
 
         <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Category</label>
+          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Category <span className="text-error">*</span></label>
           <div className="grid grid-cols-3 gap-2">
             {CATEGORIES.map(cat => (
               <button
@@ -133,21 +132,16 @@ export default function AddGroup() {
           </div>
         </div>
         
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Total Members</label>
-          <div className="relative">
-             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"><Users size={18} /></div>
-             <input
-              required
-              type="number"
-              min="1"
-              placeholder="e.g. 250"
-              className="w-full bg-dark-light border border-white/10 rounded-xl h-12 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
-              value={formData.memberCount}
-              onChange={e => setFormData({...formData, memberCount: e.target.value})}
-            />
-          </div>
-        </div>
+        <Input 
+          label="Total Members"
+          required
+          type="number"
+          min="1"
+          icon={<Users size={18} />}
+          placeholder="e.g. 250"
+          value={formData.memberCount}
+          onChange={e => setFormData({...formData, memberCount: e.target.value})}
+        />
 
         <div className="bg-primary/10 border border-primary/20 p-4 rounded-xl flex gap-3">
             <Info className="text-primary shrink-0" size={20} />
@@ -156,38 +150,26 @@ export default function AddGroup() {
             </p>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Invite Link</label>
-          <div className="relative">
-             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"><LinkIcon size={18} /></div>
-             <input
-              required
-              type="url"
-              placeholder="https://chat.whatsapp.com/..."
-              className="w-full bg-dark-light border border-white/10 rounded-xl h-12 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
-              value={formData.inviteLink}
-              onChange={e => setFormData({...formData, inviteLink: e.target.value})}
-            />
-          </div>
-          <p className="text-[10px] text-gray-500 ml-1">Must be a valid WhatsApp invite URL.</p>
-        </div>
+        <Input 
+          label="Invite Link"
+          required
+          type="url"
+          icon={<LinkIcon size={18} />}
+          placeholder="https://chat.whatsapp.com/..."
+          value={formData.inviteLink}
+          onChange={e => setFormData({...formData, inviteLink: e.target.value})}
+        />
+
+        <Input 
+          label="Tags"
+          icon={<Hash size={18} />}
+          placeholder="tech, coding, community"
+          value={formData.tags}
+          onChange={e => setFormData({...formData, tags: e.target.value})}
+        />
 
         <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Tags</label>
-          <div className="relative">
-             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"><Hash size={18} /></div>
-             <input
-              type="text"
-              placeholder="tech, coding, community (comma separated)"
-              className="w-full bg-dark-light border border-white/10 rounded-xl h-12 pl-10 pr-4 text-sm focus:outline-none focus:border-primary/50 text-white placeholder:text-gray-600"
-              value={formData.tags}
-              onChange={e => setFormData({...formData, tags: e.target.value})}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Description</label>
+          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Description <span className="text-error">*</span></label>
           <textarea
             required
             rows={4}

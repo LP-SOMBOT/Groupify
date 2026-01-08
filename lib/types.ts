@@ -7,8 +7,8 @@ export interface UserProfile {
   joinedAt: number;
   balance: number;
   isBanned: boolean;
-  isCreator: boolean; // Approved for monetization
-  isBetaTester: boolean; // New Beta Tester flag
+  isCreator: boolean;
+  isBetaTester: boolean;
   monetizationFrozen: boolean;
   paymentPin?: string;
 }
@@ -21,18 +21,18 @@ export interface Group {
   description: string;
   category: string;
   inviteLink: string;
-  iconUrl?: string; // Base64 or URL
+  iconUrl?: string; 
   isVerified: boolean;
-  isGuidelineViolation: boolean; // New Violation flag
+  isGuidelineViolation: boolean;
   status: GroupStatus;
   memberCount: number;
   tags: string[];
   createdBy: string;
+  creatorName?: string; // Snapshot
+  creatorPhoto?: string; // Snapshot
   createdAt: number;
-  // Monetization fields (Views/Clicks)
   views: number;
   clicks: number;
-  // Monetization config
   accessType?: 'Free' | 'Paid';
   price?: number;
   currency?: string;
@@ -52,8 +52,10 @@ export interface CreateGroupData {
   tags: string[];
   accessType?: 'Free' | 'Paid';
   price?: number;
-  iconUrl?: string; // Base64
+  iconUrl?: string;
   memberCount: number;
+  creatorName?: string;
+  creatorPhoto?: string;
 }
 
 export interface AppNotification {
@@ -67,7 +69,15 @@ export interface AppNotification {
   read: boolean;
 }
 
-export type PaymentMethod = 'EVC Plus' | 'Zaad' | 'Sahal';
+export interface PaymentMethodConfig {
+  id: string;
+  name: string;
+  provider: string; // e.g. "EVC Plus"
+  instruction: string; // e.g. "Send to 61xxxxxx"
+  isEnabled: boolean;
+}
+
+export type PaymentMethod = string; // Dynamic now
 
 export interface WithdrawalRequest {
   id: string;

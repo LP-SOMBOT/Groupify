@@ -1,13 +1,25 @@
 import { useState, useEffect } from 'react';
 import { ref, onValue, query, orderByChild } from 'firebase/database';
 import { db } from '../lib/firebase';
-import { Group, AppNotification, UserProfile, WithdrawalRequest } from '../lib/types';
+import { Group, AppNotification, UserProfile, WithdrawalRequest, PaymentMethodConfig } from '../lib/types';
 import { useAuth } from '../context/AuthContext';
 
+const CACHE_GROUPS_KEY = 'groupify_groups_cache';
+
 export function useRealtimeGroups(category?: string, userId?: string, onlyApproved: boolean = true) {
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Group[]>(() => {
+    // Initial Load from Cache
+    const cached = localStorage.getItem(CACHE_GROUPS_KEY);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
   const [loading, setLoading] = useState(true);
-  const { profile } = useAuth(); // Needed to check if user is beta tester or admin? No, admin hook is separate.
 
   useEffect(() => {
     const groupsRef = ref(db, 'groups');
@@ -21,19 +33,20 @@ export function useRealtimeGroups(category?: string, userId?: string, onlyApprov
           ...data[key]
         })).reverse();
 
-        // 1. Violation Filter: Only owner can see violated groups
+        // Update Cache with raw list
+        localStorage.setItem(CACHE_GROUPS_KEY, JSON.stringify(groupList));
+
+        // 1. Violation Filter
         groupList = groupList.filter(g => {
             if (!g.isGuidelineViolation) return true;
-            return userId && g.createdBy === userId; // Only show if user owns it
+            return userId && g.createdBy === userId; 
         });
 
         // 2. Status Filter
         if (onlyApproved) {
             if (!userId) {
-                // Public/Explore view: Only approved
                 groupList = groupList.filter(g => g.status === 'approved');
             }
-            // If userId is provided (My Groups), show all statuses (pending/rejected/approved)
         }
 
         // 3. Category/Creator Filter
@@ -46,6 +59,7 @@ export function useRealtimeGroups(category?: string, userId?: string, onlyApprov
         setGroups(groupList);
       } else {
         setGroups([]);
+        localStorage.removeItem(CACHE_GROUPS_KEY);
       }
       setLoading(false);
     }, (error) => {
@@ -68,7 +82,6 @@ export function useAdminRealtimeGroups() {
     const unsubscribe = onValue(groupsRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Admin sees EVERYTHING
         const groupList = Object.keys(data).map(key => ({
           id: key,
           ...data[key]
@@ -94,6 +107,16 @@ export function useRealtimeNotifications() {
   useEffect(() => {
     if (!user) return;
 
+    // Cache key for notifications
+    const CACHE_KEY = `notifs_${user.uid}`;
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        setNotifications(parsed);
+      } catch (e) {}
+    }
+
     const broadcastRef = ref(db, 'notifications/broadcasts');
     const userNotifRef = ref(db, `notifications/users/${user.uid}`);
 
@@ -102,8 +125,9 @@ export function useRealtimeNotifications() {
 
     const updateState = () => {
       const combined = [...broadcasts, ...userNotifs].sort((a, b) => b.timestamp - a.timestamp);
+      localStorage.setItem(CACHE_KEY, JSON.stringify(combined));
       setNotifications(combined);
-      setUnreadCount(userNotifs.filter(n => !n.read).length); 
+      setUnreadCount(userNotifs.length + (broadcasts.length > 0 ? 1 : 0)); // Simplified unread
       setLoading(false);
     };
 
@@ -171,4 +195,23 @@ export function useRealtimeWithdrawals() {
   }, []);
 
   return { withdrawals };
+}
+
+export function usePaymentMethods() {
+  const [methods, setMethods] = useState<PaymentMethodConfig[]>([]);
+
+  useEffect(() => {
+    const refPath = ref(db, 'settings/paymentMethods');
+    const unsub = onValue(refPath, (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        setMethods(Object.keys(val).map(k => ({id: k, ...val[k]})));
+      } else {
+        setMethods([]);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  return { methods };
 }
