@@ -15,7 +15,7 @@ import { Group, UserProfile, WithdrawalRequest, PaymentMethodConfig } from '../l
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
-import { Shield, Trash2, LogOut, BellRing, User, DollarSign, Wallet, Eye, MousePointerClick, LayoutDashboard, Users, Layers, CreditCard, Menu, X } from 'lucide-react';
+import { Shield, Trash2, LogOut, BellRing, User, DollarSign, Wallet, Eye, MousePointerClick, LayoutDashboard, Users as UsersIcon, Layers, CreditCard, Menu, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { formatCompactNumber } from '../lib/utils';
@@ -97,7 +97,7 @@ export default function Admin() {
             if(!isNaN(v)) updates.views = v;
             if(!isNaN(c)) updates.clicks = c;
             await updateGroup(selectedGroup.id, updates);
-            showToast('Stats updated & Revenue recalculated', 'success');
+            showToast('Stats updated', 'success');
             setSelectedGroup(null);
         }
     }
@@ -155,7 +155,7 @@ export default function Admin() {
                 
                 <nav className="space-y-1">
                     <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-                    <SidebarItem id="users" icon={Users} label="Users Management" />
+                    <SidebarItem id="users" icon={UsersIcon} label="Users Management" />
                     <SidebarItem id="groups" icon={Layers} label="Groups Management" />
                     <SidebarItem id="withdrawals" icon={Wallet} label="Withdrawals" />
                     <SidebarItem id="payments" icon={CreditCard} label="Payment Methods" />

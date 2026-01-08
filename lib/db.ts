@@ -13,6 +13,9 @@ import { db } from './firebase';
 import { Group, CreateGroupData, PaymentMethod, UserProfile, PaymentMethodConfig } from './types';
 import { getDeviceId } from './utils';
 
+const RATE_VIEW = 0.005;
+const RATE_CLICK = 0.02;
+
 // --- Users ---
 
 export const createUserProfile = async (uid: string, email: string, name: string) => {
@@ -92,6 +95,17 @@ export const deleteGroup = async (groupId: string) => {
 
 // --- Unique Tracking Logic ---
 
+const shouldMonetize = async (ownerId: string): Promise<boolean> => {
+  try {
+    const snap = await get(ref(db, `users/${ownerId}`));
+    if (!snap.exists()) return false;
+    const user = snap.val();
+    return (user.isCreator || user.isBetaTester) && !user.monetizationFrozen;
+  } catch {
+    return false;
+  }
+};
+
 export const trackGroupClick = async (groupId: string, ownerId: string, currentUserId?: string) => {
   // Don't count owner clicks
   if (currentUserId && currentUserId === ownerId) return;
@@ -102,8 +116,16 @@ export const trackGroupClick = async (groupId: string, ownerId: string, currentU
   const snapshot = await get(trackRef);
   if (!snapshot.exists()) {
     await set(trackRef, true); // Mark as clicked
+    
     const updates: any = {};
     updates[`groups/${groupId}/clicks`] = increment(1);
+    
+    // Add Revenue if eligible
+    const monetize = await shouldMonetize(ownerId);
+    if (monetize) {
+       updates[`users/${ownerId}/balance`] = increment(RATE_CLICK);
+    }
+
     await update(ref(db), updates);
   }
 };
@@ -118,8 +140,16 @@ export const trackGroupView = async (groupId: string, ownerId: string, currentUs
   const snapshot = await get(trackRef);
   if (!snapshot.exists()) {
     await set(trackRef, true); // Mark as viewed
+    
     const updates: any = {};
     updates[`groups/${groupId}/views`] = increment(1);
+    
+    // Add Revenue if eligible
+    const monetize = await shouldMonetize(ownerId);
+    if (monetize) {
+       updates[`users/${ownerId}/balance`] = increment(RATE_VIEW);
+    }
+    
     await update(ref(db), updates);
   }
 };
