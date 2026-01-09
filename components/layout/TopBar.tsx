@@ -7,8 +7,8 @@ export default function TopBar() {
   const location = useLocation();
   const { unreadCount } = useRealtimeNotifications();
 
-  // Hide header on notifications page as requested
-  if (location.pathname === '/notifications') return null;
+  // Hide header on notifications page and dashboard as requested
+  if (location.pathname === '/notifications' || location.pathname === '/dashboard') return null;
 
   return (
     <header className="sticky top-0 z-40 w-full bg-dark/80 backdrop-blur-md border-b border-white/5 px-4 h-14 flex items-center justify-between">

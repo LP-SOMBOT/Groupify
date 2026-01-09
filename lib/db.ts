@@ -38,7 +38,11 @@ export const createUserProfile = async (uid: string, email: string, name: string
 };
 
 export const updateUserProfile = async (uid: string, data: Partial<UserProfile>) => {
-  await update(ref(db, `users/${uid}`), data);
+  // Sanitize undefined
+  const safeData = Object.fromEntries(
+    Object.entries(data).filter(([_, v]) => v !== undefined)
+  );
+  await update(ref(db, `users/${uid}`), safeData);
 };
 
 export const adminUpdateUser = async (uid: string, updates: Partial<UserProfile>) => {
@@ -47,6 +51,10 @@ export const adminUpdateUser = async (uid: string, updates: Partial<UserProfile>
 
 export const adminAdjustBalance = async (uid: string, amount: number) => {
   await update(ref(db, `users/${uid}`), { balance: increment(amount) });
+};
+
+export const deleteUser = async (uid: string) => {
+  await remove(ref(db, `users/${uid}`));
 };
 
 // --- Groups ---
@@ -66,7 +74,12 @@ export const createGroup = async (data: CreateGroupData, userId: string): Promis
     clicks: 0
   };
 
-  await set(newGroupRef, groupData);
+  // Sanitize undefined values for Firebase RTDB which strictly rejects them
+  const safeData = Object.fromEntries(
+    Object.entries(groupData).filter(([_, v]) => v !== undefined)
+  );
+
+  await set(newGroupRef, safeData);
   return newGroupRef.key as string;
 };
 
@@ -85,7 +98,10 @@ export const updateGroupStatus = async (groupId: string, status: 'approved' | 'r
 };
 
 export const updateGroup = async (groupId: string, data: Partial<Group>) => {
-  await update(ref(db, `groups/${groupId}`), data);
+  const safeData = Object.fromEntries(
+    Object.entries(data).filter(([_, v]) => v !== undefined)
+  );
+  await update(ref(db, `groups/${groupId}`), safeData);
 };
 
 export const deleteGroup = async (groupId: string) => {

@@ -11,6 +11,7 @@ export interface UserProfile {
   isBetaTester: boolean;
   monetizationFrozen: boolean;
   paymentPin?: string;
+  creatorWelcomeSeen?: boolean;
 }
 
 export type GroupStatus = 'pending' | 'approved' | 'rejected';

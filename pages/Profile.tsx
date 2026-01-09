@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
-import { LogOut, Settings, User, ChevronRight, MessageCircle, Sparkles, Lock, Trophy, Zap, FlaskConical, LayoutDashboard } from 'lucide-react';
+import { LogOut, Settings, User, ChevronRight, MessageCircle, Sparkles, Lock, Trophy, Zap, FlaskConical, LayoutDashboard, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getNameInitials } from '../lib/utils';
 import { useToast } from '../context/ToastContext';
@@ -15,6 +15,7 @@ export default function Profile() {
   // Fetch groups to calculate eligibility locally for the UI preview
   const { groups } = useRealtimeGroups(undefined, user?.uid, false);
   const [isJoining, setIsJoining] = useState(false);
+  const [justJoined, setJustJoined] = useState(false);
   
   const handleLogout = async () => {
     await logout();
@@ -27,13 +28,23 @@ export default function Profile() {
     try {
         // Simulate network delay for effect
         await new Promise(r => setTimeout(r, 1500));
-        await updateUserProfile(profile.uid, { isCreator: true });
-        showToast("Welcome to the Creator Program!", "success");
+        
+        // Update DB: Set isCreator true AND creatorWelcomeSeen true immediately.
+        // This ensures if they leave the page and come back, they don't see the success card again.
+        // We rely on local 'justJoined' state to show the success message for this session only.
+        await updateUserProfile(profile.uid, { isCreator: true, creatorWelcomeSeen: true });
+        
+        setJustJoined(true);
     } catch (e) {
         showToast("Error joining program.", "error");
     } finally {
         setIsJoining(false);
     }
+  };
+
+  const handleViewDashboard = async () => {
+      // No need to update DB here anymore
+      navigate('/dashboard');
   };
 
   if (!user) {
@@ -51,6 +62,10 @@ export default function Profile() {
   // Cap at 100 for visual bar
   const progressPercent = Math.min((totalViews / ELIGIBILITY_THRESHOLD) * 100, 100);
   const isEligible = totalViews >= ELIGIBILITY_THRESHOLD || profile?.isBetaTester;
+  
+  // Show welcome/success ONLY if justJoined local state is true.
+  // We ignore profile.creatorWelcomeSeen for display logic because we set it to true immediately.
+  const showSuccessCard = justJoined;
 
   return (
     <div className="space-y-6 pt-4 animate-fade-in pb-20">
@@ -82,30 +97,58 @@ export default function Profile() {
       </div>
 
       {/* Creator Program Section Logic */}
-      {profile?.isCreator ? (
+      {showSuccessCard ? (
+        // STATE 4: SUCCESS (ACTIVATED)
+        <div className="w-full bg-dark-light border border-success/30 p-6 rounded-3xl shadow-xl flex flex-col items-center justify-center text-center animate-fade-in relative overflow-hidden">
+             {/* Background glow effect */}
+            <div className="absolute inset-0 bg-success/5 pointer-events-none"></div>
+            
+            <div className="w-20 h-20 bg-success/20 rounded-full flex items-center justify-center text-success mb-4 relative z-10 shadow-[0_0_20px_rgba(76,175,80,0.3)]">
+                <CheckCircle size={40} strokeWidth={3} />
+            </div>
+            
+            <h3 className="text-2xl font-bold text-white mb-2 relative z-10">Activated</h3>
+            <p className="text-gray-400 text-sm mb-6 text-center max-w-[80%] relative z-10">
+                You have successfully joined the Creator Program.
+            </p>
+
+            <Button 
+                fullWidth 
+                onClick={handleViewDashboard}
+                className="bg-primary hover:bg-primary-light text-white shadow-lg shadow-primary/20 border-0 relative z-10"
+            >
+                View Dashboard
+            </Button>
+        </div>
+      ) : profile?.isCreator ? (
         // STATE 3: ALREADY A CREATOR
         <button 
           onClick={() => navigate('/dashboard')}
-          className="w-full bg-[#1A1A2E] border border-primary/30 p-5 rounded-3xl shadow-lg shadow-primary/10 flex items-center justify-between group active:scale-[0.98] transition-all relative overflow-hidden"
+          className="w-full bg-[#1A1A2E] border border-white/5 p-4 rounded-3xl shadow-lg flex items-center justify-between group active:scale-[0.98] transition-all relative overflow-hidden"
         >
-           <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-50"></div>
+           {/* Background hover effect */}
+           <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+           
            <div className="flex items-center gap-4 relative z-10">
-              <div className="bg-gradient-to-br from-primary to-secondary p-3 rounded-2xl text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform duration-300">
-                  <LayoutDashboard size={24} />
+              {/* Icon */}
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#A855F7] to-[#EC4899] flex items-center justify-center shadow-lg shadow-purple-500/20 group-hover:scale-105 transition-transform duration-300">
+                  <LayoutDashboard size={22} className="text-white" />
               </div>
+              
               <div className="text-left">
-                  <h3 className="text-white font-bold text-lg flex items-center gap-2">
-                    Creator Studio 
-                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full">Pro</span>
-                  </h3>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-white font-bold text-base">Creator Studio</h3>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xs text-gray-400">Balance:</span>
-                    <span className="text-sm font-bold text-success bg-success/10 px-2 py-0.5 rounded-md border border-success/20">${(profile.balance || 0).toFixed(2)}</span>
+                    <span className="text-sm font-bold text-[#4CAF50]">${(profile.balance || 0).toFixed(2)}</span>
                   </div>
               </div>
            </div>
-           <div className="bg-white/5 p-2 rounded-full border border-white/5">
-              <ChevronRight className="text-white group-hover:translate-x-1 transition-transform" size={20} />
+           
+           {/* Action Icon */}
+           <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/5 group-hover:bg-white/10 transition-colors">
+              <ChevronRight className="text-gray-400 group-hover:text-white transition-colors" size={16} />
            </div>
         </button>
       ) : isEligible ? (

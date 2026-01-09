@@ -8,7 +8,8 @@ import {
     processWithdrawal,
     updateGroup,
     addPaymentMethod,
-    removePaymentMethod
+    removePaymentMethod,
+    deleteUser
 } from '../lib/db';
 import { useAdminRealtimeGroups, useRealtimeUsers, useRealtimeWithdrawals, usePaymentMethods } from '../hooks/useRealtime';
 import { Group, UserProfile } from '../lib/types';
@@ -33,6 +34,9 @@ export default function Admin() {
     // UI State
     const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'groups' | 'withdrawals' | 'methods' | 'broadcast'>('dashboard');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
+    
+    // Group Filters
+    const [groupTab, setGroupTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
     // Modals State
     const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
@@ -78,6 +82,15 @@ export default function Admin() {
         setSelectedUser(null);
     }
 
+    const handleDeleteUser = async () => {
+        if(!selectedUser) return;
+        if(confirm(`Permanently delete user ${selectedUser.displayName}? This cannot be undone.`)) {
+            await deleteUser(selectedUser.uid);
+            showToast('User deleted', 'success');
+            setSelectedUser(null);
+        }
+    }
+
     const handleAddMoney = async () => {
         if (!selectedUser) return;
         const amount = parseFloat(balanceAdj);
@@ -110,7 +123,6 @@ export default function Admin() {
     }
 
     const handleDeletePaymentMethod = async (id: string) => {
-        // Use standard confirm here for admin speed, or could wrap in a custom modal
         if(confirm('Delete this withdrawal method?')) {
             await removePaymentMethod(id);
             showToast('Method deleted', 'success');
@@ -242,8 +254,24 @@ export default function Admin() {
                     {/* GROUPS */}
                     {activeTab === 'groups' && (
                         <div className="space-y-4">
-                            <h2 className="text-2xl font-bold">Group Management</h2>
-                            {groups.map(g => (
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-2xl font-bold">Group Management</h2>
+                                <span className="text-xs text-gray-500">Total: {groups.length}</span>
+                            </div>
+
+                            <div className="flex p-1 bg-dark-light rounded-xl border border-white/5 mb-2">
+                                {(['pending', 'approved', 'rejected'] as const).map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setGroupTab(tab)}
+                                        className={`flex-1 py-2 rounded-lg text-xs font-bold uppercase transition-all ${groupTab === tab ? 'bg-primary text-white shadow' : 'text-gray-500 hover:text-white'}`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {groups.filter(g => g.status === groupTab).map(g => (
                                 <div key={g.id} className="bg-dark-light p-4 rounded-xl border border-white/5 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <img src={g.iconUrl} className="w-10 h-10 rounded-lg bg-gray-800 object-cover"/>
@@ -262,9 +290,16 @@ export default function Admin() {
                                         setSelectedGroup(g);
                                         setEditViews((g.views || 0).toString());
                                         setEditClicks((g.clicks || 0).toString());
-                                    }}>Edit</Button>
+                                    }}>
+                                        {groupTab === 'pending' ? 'Review' : 'Manage'}
+                                    </Button>
                                 </div>
                             ))}
+                            {groups.filter(g => g.status === groupTab).length === 0 && (
+                                <div className="text-center py-8 text-gray-500 bg-dark-light rounded-xl border border-white/5">
+                                    No {groupTab} groups found.
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -376,6 +411,9 @@ export default function Admin() {
                              </Button>
                              <Button variant="danger" className="col-span-2" onClick={() => handleUserAction(selectedUser.uid, 'ban')}>
                                  {selectedUser.isBanned ? 'Unban' : 'Ban Access'}
+                             </Button>
+                             <Button variant="danger" className="col-span-2 mt-2" onClick={handleDeleteUser}>
+                                 <Trash2 size={16} className="mr-2" /> Delete User (Permanent)
                              </Button>
                          </div>
                     </div>
