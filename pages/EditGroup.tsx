@@ -4,14 +4,16 @@ import { useAuth } from '../context/AuthContext';
 import { updateGroup } from '../lib/db';
 import { CATEGORIES, Category } from '../lib/types';
 import Button from '../components/ui/Button';
-import { ChevronLeft, Hash, Link as LinkIcon, Layers, Info, ImagePlus, Users } from 'lucide-react';
+import { ChevronLeft, Hash, Link as LinkIcon, ImagePlus } from 'lucide-react';
 import { useRealtimeGroups } from '../hooks/useRealtime';
+import { useToast } from '../context/ToastContext';
 
 export default function EditGroup() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
-  const { groups } = useRealtimeGroups(undefined, user?.uid, false); // Fetch my groups
+  const { groups } = useRealtimeGroups(undefined, user?.uid, false); 
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
@@ -49,7 +51,7 @@ export default function EditGroup() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) { 
-          alert("Image size should be less than 2MB");
+          showToast("Image size should be less than 2MB", 'error');
           return;
       }
       const reader = new FileReader();
@@ -78,11 +80,11 @@ export default function EditGroup() {
         memberCount: parseInt(formData.memberCount) || 1
       });
       
-      alert("Group updated!");
+      showToast("Group updated successfully!", 'success');
       navigate('/my-groups');
     } catch (error) {
       console.error(error);
-      alert('Failed to update group');
+      showToast('Failed to update group', 'error');
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Group } from '../../lib/types';
 import { Users, CheckCircle, ExternalLink, MousePointerClick, Eye, Clock, Edit, Trash, AlertOctagon } from 'lucide-react';
 import { formatCompactNumber, getNameInitials } from '../../lib/utils';
@@ -6,6 +6,7 @@ import Button from '../ui/Button';
 import { trackGroupClick, trackGroupView, deleteGroup } from '../../lib/db';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Modal from '../ui/Modal';
 
 interface GroupCardProps {
   group: Group;
@@ -16,6 +17,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isOwner = user?.uid === group.createdBy;
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     trackGroupView(group.id, group.createdBy, user?.uid);
@@ -27,9 +29,8 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
   };
 
   const handleDelete = async () => {
-      if(confirm('Are you sure you want to delete your group?')) {
-          await deleteGroup(group.id);
-      }
+      await deleteGroup(group.id);
+      setShowDeleteModal(false);
   }
 
   const getStatusBadge = () => {
@@ -40,6 +41,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
   };
 
   return (
+    <>
     <div className={`bg-dark-light rounded-2xl p-4 border transition-all active:scale-[0.99] flex gap-4 relative overflow-hidden ${group.isGuidelineViolation ? 'border-error/50 bg-error/5' : 'border-white/5 hover:border-primary/30'}`}>
       <div className="relative shrink-0 flex flex-col items-center gap-2">
         <img 
@@ -96,7 +98,7 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
            {isOwner && group.status === 'approved' ? (
                <div className="flex gap-2">
                    <button onClick={() => navigate(`/edit-group/${group.id}`)} className="p-1.5 bg-white/10 rounded-lg text-gray-300"><Edit size={14}/></button>
-                   <button onClick={handleDelete} className="p-1.5 bg-error/10 text-error rounded-lg"><Trash size={14}/></button>
+                   <button onClick={() => setShowDeleteModal(true)} className="p-1.5 bg-error/10 text-error rounded-lg"><Trash size={14}/></button>
                </div>
            ) : (
                 <Button 
@@ -111,6 +113,19 @@ const GroupCard: React.FC<GroupCardProps> = ({ group, showStats }) => {
         </div>
       </div>
     </div>
+
+    <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Delete Group">
+        <div className="space-y-4">
+            <p className="text-sm text-gray-400">
+                Are you sure you want to delete <span className="text-white font-bold">{group.name}</span>? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+                <Button fullWidth variant="ghost" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
+                <Button fullWidth variant="danger" onClick={handleDelete}>Confirm Delete</Button>
+            </div>
+        </div>
+    </Modal>
+    </>
   );
 };
 

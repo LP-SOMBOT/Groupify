@@ -11,11 +11,11 @@ import {
     removePaymentMethod
 } from '../lib/db';
 import { useAdminRealtimeGroups, useRealtimeUsers, useRealtimeWithdrawals, usePaymentMethods } from '../hooks/useRealtime';
-import { Group, UserProfile, WithdrawalRequest, PaymentMethodConfig } from '../lib/types';
+import { Group, UserProfile } from '../lib/types';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
-import { Shield, Trash2, LogOut, BellRing, User, DollarSign, Wallet, Eye, MousePointerClick, LayoutDashboard, Users as UsersIcon, Layers, CreditCard, Menu, X, Landmark } from 'lucide-react';
+import { Shield, Trash2, LogOut, BellRing, User, Wallet, Eye, MousePointerClick, LayoutDashboard, Layers, CreditCard, Menu, X, CheckCircle, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../context/ToastContext';
 import { formatCompactNumber } from '../lib/utils';
@@ -31,7 +31,7 @@ export default function Admin() {
     const navigate = useNavigate();
 
     // UI State
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'groups' | 'payments' | 'withdrawals' | 'broadcast'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'groups' | 'withdrawals' | 'methods' | 'broadcast'>('dashboard');
     const [isSidebarOpen, setSidebarOpen] = useState(false);
 
     // Modals State
@@ -63,9 +63,9 @@ export default function Admin() {
     }
 
     // --- Stats Calculation ---
-    const totalRevenue = users.reduce((acc, u) => acc + (u.balance || 0), 0);
     const totalViews = groups.reduce((acc, g) => acc + (g.views || 0), 0);
     const pendingWithdrawals = withdrawals.filter(w => w.status === 'pending').length;
+    const pendingGroups = groups.filter(g => g.status === 'pending').length;
 
     // --- Actions ---
 
@@ -110,10 +110,22 @@ export default function Admin() {
     }
 
     const handleDeletePaymentMethod = async (id: string) => {
+        // Use standard confirm here for admin speed, or could wrap in a custom modal
         if(confirm('Delete this withdrawal method?')) {
             await removePaymentMethod(id);
             showToast('Method deleted', 'success');
         }
+    }
+    
+    const handleGroupStatus = async (gid: string, status: 'approved' | 'rejected', owner: string, name: string) => {
+        await updateGroupStatus(gid, status, owner, name);
+        showToast(`Group ${status}`, 'success');
+        setSelectedGroup(null);
+    }
+    
+    const handleProcessWithdrawal = async (wid: string, status: 'paid' | 'rejected', uid: string, amount: number) => {
+        await processWithdrawal(wid, status, uid, amount);
+        showToast(`Withdrawal ${status}`, status === 'paid' ? 'success' : 'error');
     }
 
     if (!isAuthenticated) {
@@ -138,6 +150,8 @@ export default function Admin() {
         >
             <Icon size={20} />
             <span className="font-medium text-sm">{label}</span>
+            {id === 'withdrawals' && pendingWithdrawals > 0 && <span className="ml-auto bg-warning text-black text-[10px] px-1.5 rounded-full font-bold">{pendingWithdrawals}</span>}
+            {id === 'groups' && pendingGroups > 0 && <span className="ml-auto bg-primary text-white text-[10px] px-1.5 rounded-full font-bold">{pendingGroups}</span>}
         </button>
     );
 
@@ -155,10 +169,10 @@ export default function Admin() {
                 
                 <nav className="space-y-1">
                     <SidebarItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
-                    <SidebarItem id="users" icon={UsersIcon} label="Users Management" />
+                    <SidebarItem id="users" icon={User} label="Users Management" />
                     <SidebarItem id="groups" icon={Layers} label="Groups Management" />
                     <SidebarItem id="withdrawals" icon={Wallet} label="Withdrawals" />
-                    <SidebarItem id="payments" icon={Landmark} label="Withdrawal Methods" />
+                    <SidebarItem id="methods" icon={CreditCard} label="Withdrawal Methods" />
                     <SidebarItem id="broadcast" icon={BellRing} label="Broadcast" />
                 </nav>
 
@@ -173,7 +187,7 @@ export default function Admin() {
             <div className="flex-1 flex flex-col h-screen overflow-hidden">
                 <header className="h-16 border-b border-white/5 flex items-center px-4 justify-between bg-dark/50 backdrop-blur-md md:justify-end">
                     <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 text-gray-400"><Menu/></button>
-                    <div className="text-xs font-bold text-gray-500">v3.1.0</div>
+                    <div className="text-xs font-bold text-gray-500">v3.2.0</div>
                 </header>
 
                 <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
@@ -200,24 +214,6 @@ export default function Admin() {
                                     <div className="text-2xl font-bold text-warning mt-1">{pendingWithdrawals}</div>
                                 </div>
                             </div>
-
-                            <div className="bg-dark-light rounded-2xl border border-white/5 p-6">
-                                <h3 className="font-bold mb-4">Recent Users</h3>
-                                <div className="space-y-3">
-                                    {users.slice(0, 5).map(u => (
-                                        <div key={u.uid} className="flex items-center justify-between border-b border-white/5 pb-2 last:border-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">{u.displayName?.charAt(0)}</div>
-                                                <div>
-                                                    <div className="font-bold text-sm">{u.displayName}</div>
-                                                    <div className="text-[10px] text-gray-400">{u.email}</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-xs font-mono">${(u.balance || 0).toFixed(2)}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -234,6 +230,7 @@ export default function Admin() {
                                         <div>
                                             <div className="font-bold">{u.displayName}</div>
                                             <div className="text-xs text-gray-400">{u.email}</div>
+                                            {u.isCreator && <span className="text-[9px] bg-primary text-white px-1 rounded">Creator</span>}
                                         </div>
                                     </div>
                                     <Button size="sm" onClick={() => setSelectedUser(u)}>Manage</Button>
@@ -251,7 +248,10 @@ export default function Admin() {
                                     <div className="flex items-center gap-3">
                                         <img src={g.iconUrl} className="w-10 h-10 rounded-lg bg-gray-800 object-cover"/>
                                         <div>
-                                            <div className="font-bold text-sm">{g.name}</div>
+                                            <div className="font-bold text-sm flex items-center gap-2">
+                                                {g.name}
+                                                {g.status === 'pending' && <span className="text-[9px] bg-warning text-black px-1 rounded uppercase font-bold">Pending</span>}
+                                            </div>
                                             <div className="text-[10px] text-gray-400 flex gap-2">
                                                 <span className="flex items-center gap-1"><Eye size={10}/> {g.views || 0}</span>
                                                 <span className="flex items-center gap-1"><MousePointerClick size={10}/> {g.clicks || 0}</span>
@@ -268,17 +268,53 @@ export default function Admin() {
                         </div>
                     )}
 
-                    {/* WITHDRAWAL METHODS (Formerly Payments) */}
-                    {activeTab === 'payments' && (
+                    {/* WITHDRAWALS */}
+                    {activeTab === 'withdrawals' && (
+                        <div className="space-y-4">
+                             <h2 className="text-2xl font-bold">Withdrawal Requests</h2>
+                             {withdrawals.length === 0 && <div className="text-gray-500">No requests found.</div>}
+                             {withdrawals.map(w => (
+                                 <div key={w.id} className="bg-dark-light p-4 rounded-xl border border-white/5 flex flex-col gap-3">
+                                     <div className="flex justify-between items-start">
+                                         <div>
+                                             <div className="font-bold text-lg">${w.amount.toFixed(2)}</div>
+                                             <div className="text-xs text-gray-400">Requested by <span className="text-white font-bold">{w.userName}</span></div>
+                                         </div>
+                                         <div className={`text-[10px] px-2 py-1 rounded font-bold uppercase ${w.status === 'pending' ? 'bg-warning/20 text-warning' : w.status === 'paid' ? 'bg-success/20 text-success' : 'bg-error/20 text-error'}`}>
+                                             {w.status}
+                                         </div>
+                                     </div>
+                                     <div className="bg-white/5 p-3 rounded-lg text-sm grid grid-cols-2 gap-2">
+                                         <div><span className="text-gray-500 text-xs block">Method</span>{w.method}</div>
+                                         <div><span className="text-gray-500 text-xs block">Number</span>{w.accountNumber}</div>
+                                         <div className="col-span-2"><span className="text-gray-500 text-xs block">Date</span>{new Date(w.timestamp).toLocaleString()}</div>
+                                     </div>
+                                     {w.status === 'pending' && (
+                                         <div className="flex gap-2">
+                                             <Button fullWidth size="sm" className="bg-success hover:bg-success/90" onClick={() => handleProcessWithdrawal(w.id, 'paid', w.userId, w.amount)}>
+                                                 <CheckCircle size={16} className="mr-1"/> Mark Paid
+                                             </Button>
+                                             <Button fullWidth size="sm" variant="danger" onClick={() => handleProcessWithdrawal(w.id, 'rejected', w.userId, w.amount)}>
+                                                 <XCircle size={16} className="mr-1"/> Reject
+                                             </Button>
+                                         </div>
+                                     )}
+                                 </div>
+                             ))}
+                        </div>
+                    )}
+
+                    {/* WITHDRAWAL METHODS */}
+                    {activeTab === 'methods' && (
                         <div className="space-y-6">
                             <h2 className="text-2xl font-bold">Withdrawal Methods</h2>
-                            <p className="text-gray-400 text-sm">Define the payout options available to users in their cashout screen.</p>
+                            <p className="text-gray-400 text-sm">Configure the payment options available to creators when cashing out.</p>
                             
                             <div className="grid gap-4 md:grid-cols-2">
                                 {paymentMethods.map(m => (
                                     <div key={m.id} className="bg-dark-light p-4 rounded-xl border border-white/5 relative group">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <Landmark size={16} className="text-primary"/>
+                                            <CreditCard size={16} className="text-primary"/>
                                             <div className="font-bold">{m.name}</div>
                                         </div>
                                         <div className="text-xs text-gray-400 font-mono bg-white/5 p-1 rounded w-fit mb-2">{m.provider}</div>
@@ -288,13 +324,13 @@ export default function Admin() {
                                 ))}
                             </div>
 
-                            <form onSubmit={handleAddPaymentMethod} className="bg-dark-light p-6 rounded-xl border border-white/5 space-y-3 max-w-md">
-                                <h3 className="font-bold">Add New Method</h3>
+                            <div className="bg-dark-light p-6 rounded-xl border border-white/5 space-y-3 max-w-md">
+                                <h3 className="font-bold flex items-center gap-2"><Wallet size={18}/> Add New Method</h3>
                                 <Input placeholder="Display Name (e.g. EVC Plus)" value={payName} onChange={e => setPayName(e.target.value)} required />
                                 <Input placeholder="Provider Code (e.g. EVC, ZAAD)" value={payProv} onChange={e => setPayProv(e.target.value)} required />
                                 <Input placeholder="User Instructions (e.g. Send to *770*...)" value={payInstr} onChange={e => setPayInstr(e.target.value)} required />
-                                <Button type="submit">Add Withdrawal Method</Button>
-                            </form>
+                                <Button fullWidth onClick={handleAddPaymentMethod}>Add Method</Button>
+                            </div>
                         </div>
                     )}
                      
@@ -304,7 +340,7 @@ export default function Admin() {
                             <h2 className="text-2xl font-bold mb-4">Send Broadcast</h2>
                             <div className="bg-dark-light p-6 rounded-xl border border-white/5 space-y-4">
                                 <Input placeholder="Title" value={notifTitle} onChange={e => setNotifTitle(e.target.value)} />
-                                <textarea className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm" rows={4} placeholder="Message" value={notifMsg} onChange={e => setNotifMsg(e.target.value)} />
+                                <textarea className="w-full bg-dark border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:border-primary/50 text-white" rows={4} placeholder="Message" value={notifMsg} onChange={e => setNotifMsg(e.target.value)} />
                                 <Button fullWidth onClick={async () => {
                                     await createBroadcastNotification(notifTitle, notifMsg, 'system');
                                     showToast('Broadcast Sent', 'success');
@@ -346,13 +382,27 @@ export default function Admin() {
                 )}
             </Modal>
 
-            <Modal isOpen={!!selectedGroup} onClose={() => setSelectedGroup(null)} title="Edit Group Stats">
+            <Modal isOpen={!!selectedGroup} onClose={() => setSelectedGroup(null)} title="Manage Group">
                 {selectedGroup && (
                     <div className="space-y-4">
+                        <div className="bg-white/5 p-3 rounded-lg text-sm mb-2">
+                            <p className="text-gray-400">Status: <span className="text-white font-bold uppercase">{selectedGroup.status}</span></p>
+                            <p className="text-gray-400">Created by: <span className="text-white">{selectedGroup.creatorName || 'Unknown'}</span></p>
+                        </div>
+
+                        {selectedGroup.status === 'pending' && (
+                             <div className="flex gap-2 mb-4">
+                                <Button fullWidth className="bg-success hover:bg-success/90" onClick={() => handleGroupStatus(selectedGroup.id, 'approved', selectedGroup.createdBy, selectedGroup.name)}>Approve</Button>
+                                <Button fullWidth variant="danger" onClick={() => handleGroupStatus(selectedGroup.id, 'rejected', selectedGroup.createdBy, selectedGroup.name)}>Reject</Button>
+                             </div>
+                        )}
+
+                        <hr className="border-white/5" />
+                        
                         <p className="text-xs text-gray-400">Editing views/clicks will automatically recalculate user revenue based on the monetization rate.</p>
                         <Input label="Views" type="number" value={editViews} onChange={e => setEditViews(e.target.value)} />
                         <Input label="Clicks" type="number" value={editClicks} onChange={e => setEditClicks(e.target.value)} />
-                        <Button fullWidth onClick={handleUpdateGroupStats}>Update & Recalculate</Button>
+                        <Button fullWidth onClick={handleUpdateGroupStats}>Update Stats</Button>
                         <Button fullWidth variant="danger" onClick={async () => {
                             if(confirm("Delete?")) {
                                 await deleteGroup(selectedGroup.id);
@@ -363,7 +413,6 @@ export default function Admin() {
                     </div>
                 )}
             </Modal>
-
         </div>
     )
 }

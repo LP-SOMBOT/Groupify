@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
-import { ChevronLeft, Wallet, History, AlertCircle, Building } from 'lucide-react';
+import { ChevronLeft, Wallet, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { PaymentMethod } from '../lib/types';
 import { requestWithdrawal } from '../lib/db';
 import { usePaymentMethods } from '../hooks/useRealtime';
 import { useToast } from '../context/ToastContext';
+import { PaymentMethodConfig } from '../lib/types';
 
 export default function Cashout() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const { methods, loading: methodsLoading } = usePaymentMethods(); // New Hook usage
+  const { methods, loading: methodsLoading } = usePaymentMethods(); 
   const { showToast } = useToast();
   
   const [loading, setLoading] = useState(false);
-  const [method, setMethod] = useState<string>('');
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethodConfig | null>(null);
   const [number, setNumber] = useState('');
   const [amount, setAmount] = useState('');
   const [pin, setPin] = useState('');
@@ -46,14 +46,14 @@ export default function Cashout() {
         return;
     }
     
-    if (!method) {
+    if (!selectedMethod) {
         showToast("Please select a withdrawal method", "error");
         setLoading(false);
         return;
     }
 
     try {
-        await requestWithdrawal(user.uid, user.displayName || 'User', withdrawAmount, method, number);
+        await requestWithdrawal(user.uid, user.displayName || 'User', withdrawAmount, selectedMethod.name, number);
         showToast("Withdrawal requested successfully!", "success");
         navigate('/dashboard');
     } catch (e) {
@@ -87,7 +87,7 @@ export default function Cashout() {
                     </div>
                 ) : methods.length === 0 ? (
                     <div className="p-4 border border-white/10 rounded-xl text-center text-sm text-gray-500">
-                        No withdrawal methods available.
+                        No withdrawal methods available. Contact Admin.
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 gap-2">
@@ -95,17 +95,23 @@ export default function Cashout() {
                             <button
                                 key={m.id}
                                 type="button"
-                                onClick={() => setMethod(m.name)}
-                                className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden ${method === m.name ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'bg-dark-light border-white/5 text-gray-400 hover:bg-white/5'}`}
+                                onClick={() => setSelectedMethod(m)}
+                                className={`p-3 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col justify-between h-20 ${selectedMethod?.id === m.id ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' : 'bg-dark-light border-white/5 text-gray-400 hover:bg-white/5'}`}
                             >
                                 <div className="font-bold text-xs">{m.name}</div>
                                 <div className="text-[10px] opacity-70 truncate">{m.provider}</div>
-                                {method === m.name && <div className="absolute top-0 right-0 w-2 h-2 bg-white rounded-full m-1 animate-pulse"></div>}
+                                {selectedMethod?.id === m.id && <div className="absolute top-0 right-0 w-2 h-2 bg-white rounded-full m-1 animate-pulse"></div>}
                             </button>
                         ))}
                     </div>
                 )}
              </div>
+
+             {selectedMethod && (
+                 <div className="text-[10px] text-gray-400 bg-white/5 p-2 rounded-lg italic">
+                     <span className="font-bold">Instruction:</span> {selectedMethod.instruction}
+                 </div>
+             )}
 
              <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase">Account Number</label>

@@ -47,9 +47,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (snap.exists()) {
           const val = snap.val();
           setProfile(val);
-          // Auto logout if banned
+          // Auto logout if banned - logic can be handled by UI listeners for better UX, 
+          // but strictly enforcing here ensures security.
           if (val.isBanned) {
-            alert("Your account has been banned.");
             firebaseSignOut(auth);
           }
         }
