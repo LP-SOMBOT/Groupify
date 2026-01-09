@@ -238,41 +238,30 @@ export default function CreatorDashboard() {
   const totalViews = groups.reduce((acc, curr) => acc + (curr.views || 0), 0);
   const totalClicks = groups.reduce((acc, curr) => acc + (curr.clicks || 0), 0);
   
-  // Memoized Data Generator to prevent flicker but ensure realtime updates via totalViews dependency
+  // Memoized Data Generator
   const chartData = useMemo(() => {
     const days = timeRange === '7d' ? 7 : 30;
     const data = [];
     
-    // We deterministically seed the data based on days and total views so it looks consistent during same session 
-    // but scales with real data changes.
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
       
-      // Simulated curve: lower on weekends (just for "real" feel), random noise
       const isWeekend = date.getDay() === 0 || date.getDay() === 6;
       const baseFactor = isWeekend ? 0.6 : 1.0;
-      
-      // Distribute total views somewhat randomly across the days
-      // This is a simulation since we don't have time-series in DB
-      // We use a pseudo-random function of the date to make it stable
-      const pseudoRandom = Math.sin(date.getDate() * 12345) * 0.5 + 0.5; // 0 to 1
+      const pseudoRandom = Math.sin(date.getDate() * 12345) * 0.5 + 0.5;
       
       const avgViewsPerDay = totalViews / Math.max(days, 1);
       const dailyViews = Math.floor(avgViewsPerDay * baseFactor * (0.5 + pseudoRandom));
-      
-      // Ensure we don't go negative and maintain some correlation to totals
       const v = Math.max(0, dailyViews);
-      
-      // Revenue and Clicks derived from views
-      const c = Math.floor(v * 0.08); // 8% CTR simulation
-      const r = (c * 0.05) + (v * 0.002); // Mock revenue formula
+      const c = Math.floor(v * 0.08); 
+      const r = (c * 0.05) + (v * 0.002);
       
       data.push({ name: dayName, views: v, clicks: c, revenue: r });
     }
     return data;
-  }, [timeRange, totalViews]); // Recalculate if totals change (Realtime)
+  }, [timeRange, totalViews]);
 
   const userWithdrawals = withdrawals.filter(w => w.userId === user?.uid).slice(0, 5);
 
@@ -290,36 +279,39 @@ export default function CreatorDashboard() {
             </div>
         </div>
 
-        {/* Revenue Hero Card */}
-        <div className="relative overflow-hidden rounded-[2.5rem] p-8 bg-gradient-to-br from-[#1E1E30] to-[#141420] border border-white/10 shadow-2xl group transition-all hover:border-primary/20">
-             {/* Decorative */}
-            <div className="absolute -right-20 -top-20 w-60 h-60 bg-primary/10 rounded-full blur-[60px] group-hover:bg-primary/20 transition-all duration-1000 animate-pulse-slow"></div>
-            <div className="absolute -left-10 -bottom-10 w-40 h-40 bg-secondary/10 rounded-full blur-[50px]"></div>
+        {/* Updated Revenue Hero Card */}
+        <div className="relative overflow-hidden rounded-[2.5rem] p-8 bg-[#1A1A2E] border border-white/5 shadow-2xl relative group">
+             {/* Glow effects */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50 pointer-events-none"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-success/20 rounded-full blur-[80px] pointer-events-none"></div>
 
             <div className="relative z-10 flex flex-col items-center text-center">
-                <div className="flex items-center gap-2 mb-3 bg-white/5 px-3 py-1 rounded-full border border-white/5 backdrop-blur-sm">
-                    <Wallet size={14} className="text-gray-400" />
-                    <span className="text-xs font-bold text-gray-300 tracking-wider">AVAILABLE BALANCE</span>
+                <div className="flex items-center gap-2 mb-6 opacity-70">
+                    <Wallet size={16} className="text-gray-400" />
+                    <span className="text-xs font-bold text-gray-300 tracking-widest uppercase">Available Balance</span>
                 </div>
                 
-                <h2 className="text-5xl font-black text-white mb-8 tracking-tighter flex items-start gap-1">
-                    <span className="text-2xl text-gray-500 mt-2">$</span>
+                <h2 className="text-6xl sm:text-7xl font-black text-[#4CAF50] mb-10 tracking-tighter flex items-start justify-center gap-1 drop-shadow-lg">
+                    <span className="text-3xl sm:text-4xl opacity-50 mt-2">$</span>
                     {(profile.balance || 0).toFixed(2)}
                 </h2>
                 
-                <div className="w-full max-w-xs grid grid-cols-1 gap-3">
+                <div className="w-full max-w-xs">
                     <Button 
                         size="lg"
                         disabled={profile.monetizationFrozen || (profile.balance < 1)}
                         onClick={() => navigate('/cashout')}
-                        className="bg-white text-dark hover:bg-gray-200 border-0 font-black shadow-xl shadow-white/10 h-14 text-base transition-transform active:scale-95"
+                        className="w-full bg-white text-dark hover:bg-gray-100 hover:scale-[1.02] active:scale-[0.98] transition-all border-0 font-black h-16 text-lg shadow-[0_0_30px_rgba(255,255,255,0.1)] flex items-center justify-center gap-3 rounded-2xl"
                     >
-                        Cash Out Funds
+                        <span>Cash Out Funds</span>
+                        <div className="bg-dark text-white p-1.5 rounded-full">
+                           <ArrowUpRight size={14} strokeWidth={4} />
+                        </div>
                     </Button>
                 </div>
                 {profile.monetizationFrozen && (
-                    <span className="text-[10px] text-error mt-4 flex items-center gap-1 bg-error/10 px-2 py-1 rounded border border-error/20">
-                        <Activity size={10} /> Monetization Frozen
+                    <span className="text-[10px] text-error mt-6 flex items-center gap-1 bg-error/10 px-3 py-1.5 rounded-full border border-error/20 font-bold">
+                        <Activity size={12} /> Monetization Frozen
                     </span>
                 )}
             </div>
